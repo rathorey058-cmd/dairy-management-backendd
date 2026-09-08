@@ -3,6 +3,16 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { Tenant } from '../models/Tenant';
+import { seedDatabase } from '../utils/seed';
+
+export const seedDatabaseHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    await seedDatabase();
+    res.json({ message: 'Database seeded successfully with demo users!' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
