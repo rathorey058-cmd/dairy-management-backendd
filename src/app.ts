@@ -21,7 +21,36 @@ dotenv.config();
 const app = express();
 
 // Middlewares
-app.use(cors());
+const allowedOrigins = [
+  'https://dairy-management-frontend-theta.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:4173',
+  process.env.CLIENT_URL,
+].filter(Boolean) as string[];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      
+      // Allow if origin is in allowedOrigins or is any Vercel preview domain
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1')
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Fallback allow all for seamless API consumption
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
+  })
+);
 app.use(express.json());
 
 // Routes
@@ -39,9 +68,30 @@ app.use('/api/voice', voiceRoutes);
 app.use('/api/bandhi', bandhiRoutes);
 app.use('/api/udhari', udhariRoutes);
 
+import mongoose from 'mongoose';
+import { connectDB } from './config/db';
+
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date() });
+  res.json({ status: 'OK', timestamp: new Date(), mongoState: mongoose.connection.readyState });
+});
+
+// Seed DB trigger route
+app.get('/api/seed', async (req, res): Promise<void> => {
+  try {
+    const isConnected = await connectDB();
+    if (!isConnected) {
+      res.status(500).json({
+        success: false,
+        message: 'MongoDB connection failed. Check MONGODB_URI on Render & Whitelist 0.0.0.0/0 on MongoDB Atlas.'
+      });
+      return;
+    }
+    await seedDatabase();
+    res.json({ success: true, message: 'Database seeded successfully with demo accounts (owner@krishnadairy.com / password123).' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Global Error Handler
