@@ -44,9 +44,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });
 });
 
-// Run seeding in background
-seedDatabase().catch(err => console.error('Database seeding failed:', err));
-
 // Global Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Unhandled Server Error:', err);
