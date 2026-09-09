@@ -43,22 +43,38 @@ const enrichVoiceResult = async (
     // Try exact ID match first
     matchedFarmer = farmers.find(f => String(f._id) === rawData.farmerId || f.farmerId === rawData.farmerId);
     
-    // Try Name / Substring match (e.g. "Umrao Singh" or "उमराव सिंह")
+    // Try Name / Substring / Code Digits match (e.g. "A1", "Farmer 1", "F-0001", "Umrao Singh")
     if (!matchedFarmer && searchNameOrCode) {
-      matchedFarmer = farmers.find(f => 
-        f.name.toLowerCase().includes(searchNameOrCode) || 
-        searchNameOrCode.includes(f.name.toLowerCase()) ||
-        f.farmerId.toLowerCase() === searchNameOrCode
-      );
+      const codeDigits = searchNameOrCode.replace(/\D/g, '');
+      matchedFarmer = farmers.find(f => {
+        const fn = f.name.toLowerCase();
+        const fid = f.farmerId.toLowerCase();
+        if (fid === searchNameOrCode || fn.includes(searchNameOrCode) || searchNameOrCode.includes(fn)) return true;
+        if (codeDigits) {
+          const fDigits = fid.replace(/\D/g, '');
+          if (fDigits && parseInt(fDigits, 10) === parseInt(codeDigits, 10)) return true;
+        }
+        return false;
+      });
     }
     
-    // If still not matched, try searching text for any farmer name from DB
+    // If still not matched, try searching text for any farmer name or farmer ID digits from DB
     if (!matchedFarmer) {
       const lowerText = originalText.toLowerCase();
+      const textDigitsMatch = lowerText.match(/(?:farmer|code|kisan|किसान|कोड|a|f)?\s*(\d+)/i);
+      const textDigits = textDigitsMatch ? textDigitsMatch[1] : null;
+
       for (const f of farmers) {
         if (lowerText.includes(f.name.toLowerCase()) || lowerText.includes(f.farmerId.toLowerCase())) {
           matchedFarmer = f;
           break;
+        }
+        if (textDigits) {
+          const fDigits = f.farmerId.replace(/\D/g, '');
+          if (fDigits && parseInt(fDigits, 10) === parseInt(textDigits, 10)) {
+            matchedFarmer = f;
+            break;
+          }
         }
       }
     }
