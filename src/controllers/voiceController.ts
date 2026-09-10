@@ -539,12 +539,15 @@ export const parseVoiceCommand = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Phonetic normalization for browser STT typos (e.g. उधर -> उधार, udher -> udhar)
+    // Phonetic & STT Symbol Normalization for browser speech recognition (e.g. ₹1000 -> 1000 rupaye, उधर -> उधार)
     let cleanedTranscript = transcript.trim()
-      .replace(/\bउधर\b/gi, 'उधार')
+      .replace(/₹\s*(\d+(?:\.\d+)?)/g, '$1 rupaye ')
+      .replace(/(\d+(?:\.\d+)?)\s*₹/g, '$1 rupaye ')
+      .replace(/₹/g, ' ')
+      .replace(/उधर/g, 'उधार')
+      .replace(/उधारे/g, 'उधारी')
       .replace(/\budher\b/gi, 'udhar')
-      .replace(/\budhere\b/gi, 'udhari')
-      .replace(/\bउधारे\b/gi, 'उधारी');
+      .replace(/\budhere\b/gi, 'udhari');
 
     const text = cleanedTranscript.toLowerCase();
     const originalText = cleanedTranscript;
@@ -874,7 +877,7 @@ export const parseVoiceCommand = async (req: Request, res: Response): Promise<vo
       if (!matchedCustomer) {
         // Extract Name from text
         const cleanedName = text
-          .replace(/(?:udhar|udhari|उधार|उधारी|jama|baki|rupaye|rs|rupees|रुपये|रुपए|se|ji|जी|से|को|का|के|karo|करो|kya|batao|\d+)/gi, '')
+          .replace(/(?:udhar|udhari|उधार|उधारी|jama|baki|rupaye|rs|rupees|रुपये|रुपए|se|ji|जी|से|को|का|के|karo|करो|kya|batao|likho|लिखो|darj|दर्ज|do|दो|diya|दिया|le|ले|lo|लो|\d+)/gi, '')
           .trim();
         if (cleanedName.length > 1) {
           customerName = cleanedName.charAt(0).toUpperCase() + cleanedName.slice(1);

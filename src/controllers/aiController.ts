@@ -77,7 +77,7 @@ Respond ONLY with this exact JSON format:
   "totalAmount": number
 }`;
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey.trim()}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000);
 

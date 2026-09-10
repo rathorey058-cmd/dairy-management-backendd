@@ -85,7 +85,7 @@ DATE & RANGE RULES (Use ${todayStr} as today):
 
 CRITICAL SPEECH RECOGNITION PHONETIC CORRECTIONS:
 - Browser SpeechRecognition frequently transcribes spoken "उधार" (udhar/debt) as "उधर" (udher/there) or "उधारे". ALWAYS interpret "उधर", "उधारे", "udher", "udhere", "udhar", "udhari" with an amount or name as Customer Udhari ('COLLECT_DUE_PAYMENT' or 'DUE_PAYMENTS_QUERY').
-- "Ramesh ji ke 1000 rupaye udher" or "Ramesh ji ke 1000 rupaye उधर" -> MUST resolve to 'COLLECT_DUE_PAYMENT' (path '/udhari')!
+- "Ramesh ji ke 1000 rupaye udher" or "Ramesh ji ke ₹1000 उधर", "Ramesh ji ke ₹1000 उधर लिखो" -> MUST resolve to 'COLLECT_DUE_PAYMENT' (path '/udhari')!
 
 SUPPORTED ACTION TYPES:
 1. 'MILK_ENTRY': Farmer milk collection. Extract farmerId, farmerName, quantity, fat, snf, rate, totalAmount, shift ('Morning'/'Evening'), milkType ('Cow'/'Buffalo'/'Mixed').
@@ -121,7 +121,7 @@ SUPPORTED ACTION TYPES:
     - path: "/bandhi"
     - audioResponse: "बांधी नंबर 1, 2, 6 और 7 की नागा दर्ज कर दी गयी है, बाकी सभी का दूध वितरण रिकॉर्ड हो गया है।"
 11. 'COLLECT_DUE_PAYMENT': Customer udhari / debt / payment collection (ग्राहकों की बाज़ार उधारी / उधार देना / उधार जमा / बकाया).
-    - MUST be used whenever user mentions customer udhari, e.g.: "रमेश जी के 1000 रुपये उधार", "रमेश जी के 1000 रुपये उधर", "रमेश जी से 1000 रुपये उधारी जमा करो", "Bandhi 2 se 500 rupaye jama kar lo", "Customer Ramesh ko 1000 udhar diya"
+    - MUST be used whenever user mentions customer udhari, e.g.: "रमेश जी के 1000 रुपये उधार", "रमेश जी के 1000 रुपये उधर", "रमेश जी के ₹1000 उधर लिखो", "रमेश जी से 1000 रुपये उधारी जमा करो", "Bandhi 2 se 500 rupaye jama kar lo", "Customer Ramesh ko 1000 udhar diya"
     - Extract: customerName: "Ramesh", bandhiNo: 2 (if any), amount: 1000, paymentMode: "Cash"
     - previewTitle: "उधारी भुगतान जमा"
     - previewDetails: { "ग्राहक": "Ramesh", "जमा/उधार राशि": "₹1,000", "पेज": "बाजार उधारी (/udhari)" }
@@ -167,7 +167,7 @@ OUTPUT JSON FORMAT (Strictly return ONLY JSON):
   };
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey.trim()}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`;
     
     // 4-second timeout for ultra-fast response, fallback to local engine if network lags
     const controller = new AbortController();
