@@ -89,8 +89,8 @@ SUPPORTED ACTION TYPES:
 2. 'DELETE_MILK_ENTRY': User wants to delete, cancel, or remove a milk collection entry (e.g. "Umrao Singh ki entry delete karo", "aaj ka doodh delete kar do", "Umrao Singh ka doodh cancel karo", "doodh entry hata do"). Extract farmerId, farmerName, date ('${todayStr}'), shift ('Morning'/'Evening' or null).
 3. 'REGISTER_FARMER': Register new farmer. Extract name, mobile, village, farmerId (e.g. next code like 'F-0004').
 4. 'DIRECT_MILK_SALE': Bulk milk sale at counter. Extract totalQuantity, rate, totalAmount, shift ('Morning'/'Evening'), milkTypeCategory ('superMilk'/'regularMilk'/'cowMilk').
-5. 'FARMER_PAYMENT': Paying money to farmer. Extract farmerId, farmerName, farmerCode, amount, paymentMode ('Cash').
-6. 'FARMER_ADVANCE': Giving advance / udhar to farmer. Extract farmerId, farmerName, farmerCode, amount.
+5. 'FARMER_PAYMENT': Paying milk collection payment money to a farmer. Extract farmerId, farmerName, farmerCode, amount, paymentMode ('Cash').
+6. 'FARMER_ADVANCE': Giving advance money to a milk supplier FARMER (किसान को अग्रिम/एडवांस देना). Extract farmerId, farmerName, farmerCode, amount. (MUST be used ONLY when explicitly specified for a milk supplier FARMER, e.g. "Farmer 1 ko advance", "Kisan Rahul ko 500 advance").
 7. 'EXPENSE': Shop daily expense (diesel, chai, nasta, electricity, repairs). Extract title, amount, category.
 8. 'PRODUCT_SALE': Selling paneer, ghee, curd, butter at counter. Extract productId, productName, quantity, unit, rate, totalAmount.
 9. 'NAVIGATE': Navigation to screens with exact path:
@@ -116,14 +116,14 @@ SUPPORTED ACTION TYPES:
     - previewDetails: { "नागा बांधी नं": "1, 2, 6, 7", "शिफ्ट": "सुबह", "शेष बांधी": "वितरित (Delivered)" }
     - path: "/bandhi"
     - audioResponse: "बांधी नंबर 1, 2, 6 और 7 की नागा दर्ज कर दी गयी है, बाकी सभी का दूध वितरण रिकॉर्ड हो गया है।"
-11. 'COLLECT_DUE_PAYMENT': Customer udhari payment collection (उधारी जमा).
-    - User says e.g.: "रमेश जी से 1000 रुपये उधारी जमा करो" or "Bandhi 2 se 500 rupaye jama kar lo" or "Customer Rahul ne 1200 udhari chukta kiya"
+11. 'COLLECT_DUE_PAYMENT': Customer udhari / debt / payment collection (ग्राहकों की बाज़ार उधारी / उधार देना / उधार जमा / बकाया).
+    - MUST be used whenever user mentions customer udhari, e.g.: "रमेश जी के 1000 रुपये उधार", "रमेश जी से 1000 रुपये उधारी जमा करो", "Bandhi 2 se 500 rupaye jama kar lo", "Customer Ramesh ko 1000 udhar diya"
     - Extract: customerName: "Ramesh", bandhiNo: 2 (if any), amount: 1000, paymentMode: "Cash"
     - previewTitle: "उधारी भुगतान जमा"
-    - previewDetails: { "ग्राहक": "Ramesh", "जमा राशि": "₹1,000", "माध्यम": "नकद (Cash)" }
+    - previewDetails: { "ग्राहक": "Ramesh", "जमा/उधार राशि": "₹1,000", "पेज": "बाजार उधारी (/udhari)" }
     - path: "/udhari"
-    - audioResponse: "रमेश जी के खाते में 1000 रुपये उधारी जमा दर्ज कर ली गयी है।"
-12. 'DUE_PAYMENTS_QUERY': Inquiries about pending customer udhari.
+    - audioResponse: "रमेश जी के खाते में 1000 रुपये उधारी दर्ज करने के लिए कन्फर्म करें। उधारी पेज खोला जा रहा है।"
+12. 'DUE_PAYMENTS_QUERY': Inquiries about pending customer udhari (बाजार उधारी सूची / बकाया).
     - User says e.g.: "किस-किस की उधारी बाकी है?", "बाजार उधारी बताओ", "उधारी की लिस्ट दिखाओ", "Bandhi 2 ki udhari kitni hai"
     - Extract: queryType: "UDHARI", customerName (if specific), bandhiNo (if specific)
     - previewTitle: "बाजार उधारी खाता"

@@ -812,9 +812,108 @@ export const parseVoiceCommand = async (req: Request, res: Response): Promise<vo
     }
 
     // =========================================================================
-    // 5. FARMER ADVANCE / UDHAR (किसान अग्रिम)
+    // 4.5. CUSTOMER UDHARI / DEBT COLLECTION (ग्राहकों की बाजार उधारी / बकाया)
     // =========================================================================
-    if (text.includes('advance') || text.includes('एडवांस') || text.includes('udhar') || text.includes('उधार')) {
+    const isUdhariIntent = text.includes('udhar') || text.includes('udhari') || text.includes('उधार') || text.includes('उधारी') ||
+                          text.includes('dues') || text.includes('बकाया');
+    const isExplicitFarmerIntent = text.includes('farmer') || text.includes('kisan') || text.includes('किसान') || text.includes('फार्मर');
+
+    if (isUdhariIntent && !isExplicitFarmerIntent) {
+      // Check if user is asking for Udhari List / Query (e.g. "kis kis ki udhari baki hai", "udhari list", "bazar udhari batao")
+      const isQuery = text.includes('kis') || text.includes('किस') || text.includes('list') || text.includes('लिस्ट') ||
+                      text.includes('kitni') || text.includes('कितनी') || text.includes('batao') || text.includes('बताओ') ||
+                      text.includes('suchi') || text.includes('सूची');
+
+      if (isQuery && !text.match(/(\d+(?:\.\d+)?)\s*(?:rupaye|rs|rupees|रुपये|रुपए)/i)) {
+        const debtors = await Customer.find({ tenantId, outstandingBalance: { $gt: 0 } }).sort({ outstandingBalance: -1 });
+        const totalDue = Math.round(debtors.reduce((sum, c) => sum + (c.outstandingBalance || 0), 0) * 100) / 100;
+        const totalDebtors = debtors.length;
+        const top3 = debtors.slice(0, 3).map(c => `${c.name}: ₹${c.outstandingBalance}`).join(', ');
+
+        res.json({
+          actionType: 'DUE_PAYMENTS_QUERY',
+          path: '/udhari',
+          previewTitle: `📊 बाजार उधारी खाता सारांश`,
+          previewDetails: {
+            'कुल बाजार उधारी (Total Due)': `₹${totalDue.toLocaleString('en-IN')}`,
+            'बकाया ग्राहक संख्या': `${totalDebtors} ग्राहक`,
+            'शीर्ष बकाया': top3 || 'कोई बकाया नहीं',
+            'एक्शन': 'उधारी रजिस्टर खोला जा रहा है'
+          },
+          audioResponse: `वर्तमान में कुल ${totalDebtors} ग्राहकों पर ₹${totalDue} रुपये की उधारी बकाया है। उधारी पेज खोला जा रहा है।`,
+          transcript: originalText
+        });
+        return;
+      }
+
+      // Customer Udhari Collection / Entry (e.g. "Ramesh ji ke 1000 rupaye udhar", "Ramesh se 1000 udhari", "Bandhi 2 ka 500 udhar")
+      const amtMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:rupaye|rs|rupees|रुपये|रुपए|ka|के|को)?/i) || text.match(/(\d+(?:\.\d+)?)/);
+      const amount = amtMatch ? parseFloat(amtMatch[1]) : 0;
+
+      // Extract Customer Name or Bandhi No
+      let customerName = '';
+      const bandhiMatch = text.match(/(?:bandhi|बांधी)\s*(\d+)/i);
+      const bandhiNo = bandhiMatch ? parseInt(bandhiMatch[1]) : undefined;
+
+      // Find Customer in DB
+      let matchedCustomer = null;
+      if (bandhiNo) {
+        const b = await MilkBandhi.findOne({ tenantId, bandhiNo });
+        if (b && b.customer) {
+          matchedCustomer = await Customer.findOne({ _id: b.customer, tenantId });
+        }
+      }
+
+      if (!matchedCustomer) {
+        // Extract Name from text
+        const cleanedName = text
+          .replace(/(?:udhar|udhari|उधार|उधारी|jama|baki|rupaye|rs|rupees|रुपये|रुपए|se|ji|जी|से|को|का|के|karo|करो|kya|batao|\d+)/gi, '')
+          .trim();
+        if (cleanedName.length > 1) {
+          customerName = cleanedName.charAt(0).toUpperCase() + cleanedName.slice(1);
+          matchedCustomer = await Customer.findOne({
+            tenantId,
+            $or: [
+              { name: new RegExp(customerName, 'i') },
+              { mobile: new RegExp(customerName, 'i') }
+            ]
+          });
+        }
+      }
+
+      const displayCustName = matchedCustomer ? matchedCustomer.name : (customerName || 'Ramesh');
+      const currentOutstanding = matchedCustomer ? matchedCustomer.outstandingBalance : 0;
+      const remainingBalance = Math.round(Math.max(0, currentOutstanding - amount) * 100) / 100;
+
+      res.json({
+        actionType: 'COLLECT_DUE_PAYMENT',
+        path: '/udhari',
+        previewTitle: `उधारी भुगतान जमा: ${displayCustName}`,
+        data: {
+          customerId: matchedCustomer?._id,
+          customerName: displayCustName,
+          bandhiNo,
+          amount: amount || 1000,
+          paymentMode: 'Cash',
+          currentOutstanding,
+          remainingBalance,
+          notes: `Voice Udhar Collection: "${originalText}"`
+        },
+        previewDetails: {
+          'ग्राहक (Customer)': displayCustName,
+          'जमा/उधार राशि': `₹${(amount || 1000).toLocaleString('en-IN')}`,
+          'पेज (Page)': 'बाजार उधारी (/udhari)'
+        },
+        audioResponse: `${displayCustName} के खाते में ₹${amount || 1000} उधारी जमा दर्ज करने के लिए कन्फर्म करें। उधारी पेज खोला जा रहा है।`,
+        transcript: originalText
+      });
+      return;
+    }
+
+    // =========================================================================
+    // 5. FARMER ADVANCE (दूध उत्पादक किसान अग्रिम)
+    // =========================================================================
+    if (text.includes('advance') || text.includes('एडवांस') || (isExplicitFarmerIntent && (text.includes('udhar') || text.includes('उधार')))) {
       let matchedFarmer = null;
       for (const f of farmers) {
         if (text.includes(f.name.toLowerCase()) || text.includes(`code ${f.farmerId}`) || text.includes(`farmer ${f.farmerId}`) || text.includes(`किसान ${f.farmerId}`)) {
