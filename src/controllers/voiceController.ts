@@ -539,8 +539,15 @@ export const parseVoiceCommand = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    const text = transcript.trim().toLowerCase();
-    const originalText = transcript.trim();
+    // Phonetic normalization for browser STT typos (e.g. उधर -> उधार, udher -> udhar)
+    let cleanedTranscript = transcript.trim()
+      .replace(/\bउधर\b/gi, 'उधार')
+      .replace(/\budher\b/gi, 'udhar')
+      .replace(/\budhere\b/gi, 'udhari')
+      .replace(/\bउधारे\b/gi, 'उधारी');
+
+    const text = cleanedTranscript.toLowerCase();
+    const originalText = cleanedTranscript;
 
     // Fetch master records
     const [farmers, products, rateCharts, tenant] = await Promise.all([
