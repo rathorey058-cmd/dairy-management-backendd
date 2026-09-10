@@ -539,13 +539,10 @@ export const parseVoiceCommand = async (req: Request, res: Response): Promise<vo
     const { transcript } = req.body;
     const tenantId = (req as any).tenantId;
 
-    if (!transcript || typeof transcript !== 'string') {
-      res.status(400).json({ message: 'Transcript text is required.' });
-      return;
-    }
+    const rawText = (transcript || '').normalize('NFC');
 
     // Phonetic & STT Symbol Normalization for browser speech recognition (e.g. ₹1000 -> 1000 rupaye, उधर -> उधार)
-    let cleanedTranscript = transcript.trim()
+    let cleanedTranscript = rawText.trim()
       .replace(/₹\s*(\d+(?:\.\d+)?)/g, (match, p1) => `${p1} rupaye `)
       .replace(/(\d+(?:\.\d+)?)\s*₹/g, (match, p1) => `${p1} rupaye `)
       .replace(/₹/g, ' ')

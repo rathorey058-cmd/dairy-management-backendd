@@ -41,9 +41,10 @@ export interface ParsedVoiceResult {
 }
 
 export const parseVoiceWithGemini = async (
-  transcript: string,
+  rawTranscript: string,
   context: GeminiVoiceContext
 ): Promise<ParsedVoiceResult | null> => {
+  const transcript = (rawTranscript || '').normalize('NFC');
   const apiKey =
     context.customApiKey ||
     process.env.GEMINI_API_KEY ||
