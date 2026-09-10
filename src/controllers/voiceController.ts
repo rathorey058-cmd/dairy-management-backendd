@@ -459,9 +459,7 @@ const enrichVoiceResult = async (
     }
 
     if (!matchedCustomer && rawData.customerName) {
-      const searchName = rawData.customerName.toLowerCase().trim()
-        .replace(/(?:udhar|udhari|उधार|उधारी|jama|baki|rupaye|rs|rupees|रुपये|रुपए|se|ji|जी|से|को|का|के|karo|करो|kya|batao|likho|लिखो|darj|दर्ज|do|दो|diya|दिया|le|ले|lo|लो|\d+)/gi, '')
-        .trim();
+      const searchName = cleanCustomerNameText(rawData.customerName);
       matchedCustomer = await Customer.findOne({
         tenantId,
         $or: [
@@ -471,9 +469,7 @@ const enrichVoiceResult = async (
       });
     }
 
-    const cleanedRawName = rawData.customerName
-      ? rawData.customerName.replace(/(?:udhar|udhari|उधार|उधारी|jama|baki|rupaye|rs|rupees|रुपये|रुपए|se|ji|जी|से|को|का|के|karo|करो|kya|batao|likho|लिखो|darj|दर्ज|do|दो|diya|दिया|le|ले|lo|लो|\d+)/gi, '').trim()
-      : 'Ramesh';
+    const cleanedRawName = rawData.customerName ? cleanCustomerNameText(rawData.customerName) : 'Ramesh';
     const custName = matchedCustomer ? matchedCustomer.name : (cleanedRawName || 'Ramesh');
     const paymentAmt = parseFloat(rawData.amount) || 500;
     const currentOutstanding = matchedCustomer ? matchedCustomer.outstandingBalance : 0;
@@ -532,6 +528,24 @@ const enrichVoiceResult = async (
   }
 
   return result;
+};
+
+const STOP_WORDS_SET = new Set([
+  'udhar', 'udhari', 'उधार', 'उधारी', 'jama', 'baki', 'rupaye', 'rs', 'rupees',
+  'रुपये', 'रुपए', 'se', 'ji', 'जी', 'से', 'को', 'का', 'के', 'karo', 'करो',
+  'kya', 'batao', 'likho', 'लिखो', 'darj', 'दर्ज', 'do', 'दो', 'diya', 'दिया',
+  'le', 'ले', 'lo', 'लो', 'hai', 'है', 'ho', 'हो', 'gaya', 'गया', 'gayi', 'गयी'
+]);
+
+const cleanCustomerNameText = (inputStr: string): string => {
+  if (!inputStr) return '';
+  const words = inputStr.trim().split(/\s+/);
+  const filtered = words.filter(w => {
+    const lower = w.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '');
+    if (!lower || STOP_WORDS_SET.has(lower) || /^\d+$/.test(lower)) return false;
+    return true;
+  });
+  return filtered.join(' ').trim();
 };
 
 export const parseVoiceCommand = async (req: Request, res: Response): Promise<void> => {
@@ -878,9 +892,7 @@ export const parseVoiceCommand = async (req: Request, res: Response): Promise<vo
 
       if (!matchedCustomer) {
         // Extract Name from text
-        const cleanedName = text
-          .replace(/(?:udhar|udhari|उधार|उधारी|jama|baki|rupaye|rs|rupees|रुपये|रुपए|se|ji|जी|से|को|का|के|karo|करो|kya|batao|likho|लिखो|darj|दर्ज|do|दो|diya|दिया|le|ले|lo|लो|\d+)/gi, '')
-          .trim();
+        const cleanedName = cleanCustomerNameText(text);
         if (cleanedName.length > 1) {
           customerName = cleanedName.charAt(0).toUpperCase() + cleanedName.slice(1);
           matchedCustomer = await Customer.findOne({
