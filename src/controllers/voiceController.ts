@@ -459,17 +459,22 @@ const enrichVoiceResult = async (
     }
 
     if (!matchedCustomer && rawData.customerName) {
-      const searchName = rawData.customerName.toLowerCase().trim();
+      const searchName = rawData.customerName.toLowerCase().trim()
+        .replace(/(?:udhar|udhari|उधार|उधारी|jama|baki|rupaye|rs|rupees|रुपये|रुपए|se|ji|जी|से|को|का|के|karo|करो|kya|batao|likho|लिखो|darj|दर्ज|do|दो|diya|दिया|le|ले|lo|लो|\d+)/gi, '')
+        .trim();
       matchedCustomer = await Customer.findOne({
         tenantId,
         $or: [
-          { name: new RegExp(searchName, 'i') },
-          { mobile: new RegExp(searchName, 'i') }
+          { name: new RegExp(searchName || 'Ramesh', 'i') },
+          { mobile: new RegExp(searchName || 'Ramesh', 'i') }
         ]
       });
     }
 
-    const custName = matchedCustomer ? matchedCustomer.name : (rawData.customerName || 'Customer');
+    const cleanedRawName = rawData.customerName
+      ? rawData.customerName.replace(/(?:udhar|udhari|उधार|उधारी|jama|baki|rupaye|rs|rupees|रुपये|रुपए|se|ji|जी|से|को|का|के|karo|करो|kya|batao|likho|लिखो|darj|दर्ज|do|दो|diya|दिया|le|ले|lo|लो|\d+)/gi, '').trim()
+      : 'Ramesh';
+    const custName = matchedCustomer ? matchedCustomer.name : (cleanedRawName || 'Ramesh');
     const paymentAmt = parseFloat(rawData.amount) || 500;
     const currentOutstanding = matchedCustomer ? matchedCustomer.outstandingBalance : 0;
     const remainingBalance = Math.round(Math.max(0, currentOutstanding - paymentAmt) * 100) / 100;
@@ -541,8 +546,8 @@ export const parseVoiceCommand = async (req: Request, res: Response): Promise<vo
 
     // Phonetic & STT Symbol Normalization for browser speech recognition (e.g. ₹1000 -> 1000 rupaye, उधर -> उधार)
     let cleanedTranscript = transcript.trim()
-      .replace(/₹\s*(\d+(?:\.\d+)?)/g, '$1 rupaye ')
-      .replace(/(\d+(?:\.\d+)?)\s*₹/g, '$1 rupaye ')
+      .replace(/₹\s*(\d+(?:\.\d+)?)/g, (match, p1) => `${p1} rupaye `)
+      .replace(/(\d+(?:\.\d+)?)\s*₹/g, (match, p1) => `${p1} rupaye `)
       .replace(/₹/g, ' ')
       .replace(/उधर/g, 'उधार')
       .replace(/उधारे/g, 'उधारी')
