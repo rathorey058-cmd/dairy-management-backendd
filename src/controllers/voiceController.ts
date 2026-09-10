@@ -543,8 +543,8 @@ export const parseVoiceCommand = async (req: Request, res: Response): Promise<vo
 
     // Phonetic & STT Symbol Normalization for browser speech recognition (e.g. ₹1000 -> 1000 rupaye, उधर -> उधार)
     let cleanedTranscript = rawText.trim()
-      .replace(/₹\s*(\d+(?:\.\d+)?)/g, (match, p1) => `${p1} rupaye `)
-      .replace(/(\d+(?:\.\d+)?)\s*₹/g, (match, p1) => `${p1} rupaye `)
+      .replace(/₹\s*(\d+(?:\.\d+)?)/g, (match: string, p1: string) => `${p1} rupaye `)
+      .replace(/(\d+(?:\.\d+)?)\s*₹/g, (match: string, p1: string) => `${p1} rupaye `)
       .replace(/₹/g, ' ')
       .replace(/उधर/g, 'उधार')
       .replace(/उधारे/g, 'उधारी')
