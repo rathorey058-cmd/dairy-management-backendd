@@ -95,9 +95,11 @@ export const getTimeIntervalGallaReport = async (req: Request, res: Response): P
     const [startH, startM] = (startTime as string).split(':').map(Number);
     const [endH, endM] = (endTime as string).split(':').map(Number);
 
-    const [y, m, d] = baseDateStr.split('-').map(Number);
-    const filterStart = new Date(y, m - 1, d, startH || 0, startM || 0, 0, 0);
-    const filterEnd = new Date(y, m - 1, d, endH || 23, endM || 59, 59, 999);
+    const pad = (n: number) => (isNaN(n) ? '00' : n.toString().padStart(2, '0'));
+    const startIso = `${baseDateStr}T${pad(startH || 0)}:${pad(startM || 0)}:00+05:30`;
+    const endIso = `${baseDateStr}T${pad(endH !== undefined ? endH : 23)}:${pad(endM !== undefined ? endM : 59)}:59.999+05:30`;
+    const filterStart = new Date(startIso);
+    const filterEnd = new Date(endIso);
 
     // 1. Fetch Milk Sales in this window
     const milkSales = await MilkSale.find({
