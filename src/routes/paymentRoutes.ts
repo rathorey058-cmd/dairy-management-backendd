@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { giveAdvance, makePayment, settleAccount, getSettlementById } from '../controllers/paymentController';
+import { giveAdvance, makePayment, settleAccount, getSettlementById, getSettlementCycleSheet } from '../controllers/paymentController';
 import { authenticate } from '../middleware/authMiddleware';
 import { checkDayClosed } from '../middleware/closeDayMiddleware';
 
@@ -10,6 +10,7 @@ router.use(authenticate);
 router.post('/advance', checkDayClosed, giveAdvance);
 router.post('/pay', checkDayClosed, makePayment);
 router.post('/settle', checkDayClosed, settleAccount);
+router.get('/settlement-cycle-sheet', getSettlementCycleSheet);
 router.get('/settlement/:id', getSettlementById);
 
 export default router;

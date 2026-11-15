@@ -1204,10 +1204,15 @@ export const parseVoiceCommand = async (req: Request, res: Response): Promise<vo
     }
 
     // 9C. Milk Collection Query & History (कल का दूध / 7 दिन का दूध संकलन)
+    const isExplicitMilkQuery = text.includes('kitna') || text.includes('कितना') || 
+                                text.includes('dikhao') || text.includes('दिखाओ') || 
+                                text.includes('kholo') || text.includes('खोलो') ||
+                                text.includes('summary') || text.includes('report') || text.includes('रिपोर्ट') ||
+                                (isPastDate && !text.match(/(\d+(?:\.\d+)?)\s*(?:litre|ltr|l|लीटर|fat|फैट)/i));
+
     if (
       (text.includes('doodh') || text.includes('dudh') || text.includes('दूध') || text.includes('milk')) &&
-      (text.includes('kitna') || text.includes('कितना') || text.includes('dikhao') || text.includes('दिखाओ') || 
-       text.includes('kholo') || text.includes('खोलो') || text.includes('aaya') || text.includes('आया') || isPastDate)
+      isExplicitMilkQuery
     ) {
       const collections = await MilkCollection.find({
         tenantId: req.tenantId,

@@ -16,6 +16,25 @@ export interface IMilkCollection {
   amount: number;
   operator: Types.ObjectId; // Ref User
   notes?: string;
+  aiVerification?: {
+    aiDetected?: {
+      weight?: number;
+      fat?: number;
+      snf?: number;
+      clr?: number;
+      confidence?: number;
+      rawText?: string;
+    };
+    operatorEntered?: {
+      weight?: number;
+      fat?: number;
+      snf?: number;
+    };
+    isMismatched?: boolean;
+    mismatchReason?: string;
+    snapshotImage?: string;
+    verificationStatus?: 'MATCHED' | 'OVERRIDDEN' | 'MANUAL' | 'FLAGGED';
+  };
 }
 
 const milkCollectionSchema = new Schema<IMilkCollection>({
@@ -33,7 +52,30 @@ const milkCollectionSchema = new Schema<IMilkCollection>({
   rate: { type: Number, required: true },
   amount: { type: Number, required: true },
   operator: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  notes: { type: String }
+  notes: { type: String },
+  aiVerification: {
+    aiDetected: {
+      weight: { type: Number },
+      fat: { type: Number },
+      snf: { type: Number },
+      clr: { type: Number },
+      confidence: { type: Number },
+      rawText: { type: String }
+    },
+    operatorEntered: {
+      weight: { type: Number },
+      fat: { type: Number },
+      snf: { type: Number }
+    },
+    isMismatched: { type: Boolean, default: false },
+    mismatchReason: { type: String },
+    snapshotImage: { type: String },
+    verificationStatus: { 
+      type: String, 
+      enum: ['MATCHED', 'OVERRIDDEN', 'MANUAL', 'FLAGGED'], 
+      default: 'MANUAL' 
+    }
+  }
 }, { timestamps: true });
 
 milkCollectionSchema.index({ tenantId: 1, date: -1 });

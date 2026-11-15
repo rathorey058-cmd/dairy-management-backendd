@@ -90,7 +90,8 @@ CRITICAL SPEECH RECOGNITION PHONETIC CORRECTIONS:
 
 SUPPORTED ACTION TYPES:
 1. 'MILK_ENTRY': Farmer milk collection. Extract farmerId, farmerName, quantity, fat, snf, rate, totalAmount, shift ('Morning'/'Evening'), milkType ('Cow'/'Buffalo'/'Mixed').
-   - Note: If user says two-digit fat like '54' or '62', it means 5.4% or 6.2% FAT.
+   - CRITICAL RULE: Spoken text mentioning a farmer with quantity/fat (e.g. "Umrao Singh ji ka 50 litre doodh 5.4 fat", "is farmer ka itna doodh aaya", "Farmer 1 ka 10 litre doodh aaya", "Ram ka 20L doodh aaya 4.5 fat", "Rahul ka doodh 15 litre") MUST ALWAYS BE CLASSIFIED AS 'MILK_ENTRY'! NEVER classify it as NAVIGATE or AI_QUERY.
+   - Note: If user says two-digit fat like '54' or '62', it means 5.4% or 6.2% FAT. If no fat is spoken, default fat = 5.0%.
 2. 'DELETE_MILK_ENTRY': User wants to delete, cancel, or remove a milk collection entry (e.g. "Umrao Singh ki entry delete karo", "aaj ka doodh delete kar do", "Umrao Singh ka doodh cancel karo", "doodh entry hata do"). Extract farmerId, farmerName, date ('${todayStr}'), shift ('Morning'/'Evening' or null).
 3. 'REGISTER_FARMER': Register new farmer. Extract name, mobile, village, farmerId (e.g. next code like 'F-0004').
 4. 'DIRECT_MILK_SALE': Bulk milk sale at counter. Extract totalQuantity, rate, totalAmount, shift ('Morning'/'Evening'), milkTypeCategory ('superMilk'/'regularMilk'/'cowMilk').
@@ -168,7 +169,7 @@ OUTPUT JSON FORMAT (Strictly return ONLY JSON):
   };
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey.trim()}`;
     
     // 4-second timeout for ultra-fast response, fallback to local engine if network lags
     const controller = new AbortController();

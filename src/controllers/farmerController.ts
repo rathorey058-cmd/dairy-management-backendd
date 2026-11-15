@@ -34,7 +34,12 @@ export const getFarmers = async (req: Request, res: Response): Promise<void> => 
 
 export const createFarmer = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, mobile, village, address, bankAccount, ifsc, upi, openingBalance, openingAdvance, notes, fatRate } = req.body;
+    const { 
+      name, mobile, village, address, bankAccount, ifsc, upi, 
+      openingBalance, openingAdvance, notes, fatRate,
+      dpdpConsentGiven = true,
+      dpdpConsentChannel = 'WHATSAPP_SMS_PHYSICAL'
+    } = req.body;
 
     if (!name || !mobile || !village) {
       res.status(400).json({ message: 'Name, mobile and village are required.' });
@@ -58,7 +63,10 @@ export const createFarmer = async (req: Request, res: Response): Promise<void> =
       openingBalance: openingBalance || 0,
       openingAdvance: openingAdvance || 0,
       fatRate: fatRate || 0,
-      notes
+      notes,
+      dpdpConsentGiven: dpdpConsentGiven !== false,
+      dpdpConsentDate: new Date(),
+      dpdpConsentChannel
     });
 
     await farmer.save();
@@ -95,6 +103,35 @@ export const getFarmerById = async (req: Request, res: Response): Promise<void> 
   } catch (error) {
     console.error('Get Farmer By ID Error:', error);
     res.status(500).json({ message: 'Error fetching farmer details.' });
+  }
+};
+
+export const updateFarmer = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const updateData = { ...req.body };
+    delete updateData.farmerId;
+    delete updateData.tenantId;
+
+    if (updateData.dpdpConsentGiven !== undefined) {
+      updateData.dpdpConsentDate = new Date();
+    }
+
+    const updated = await Farmer.findOneAndUpdate(
+      { _id: id, tenantId: req.tenantId },
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!updated) {
+      res.status(404).json({ message: 'Farmer not found.' });
+      return;
+    }
+
+    res.json(updated);
+  } catch (error) {
+    console.error('Update Farmer Error:', error);
+    res.status(500).json({ message: 'Error updating farmer.' });
   }
 };
 

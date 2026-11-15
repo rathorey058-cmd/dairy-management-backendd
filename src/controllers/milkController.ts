@@ -7,13 +7,15 @@ import { MilkSale } from '../models/MilkSale';
 import { ProductionBatch } from '../models/ProductionBatch';
 import { MaterialConversion } from '../models/MaterialConversion';
 import { Product } from '../models/Product';
+import { CameraAuditLog } from '../models/CameraAuditLog';
 import { calculateMilkRate, calculateWeightedAverages, postLedgerEntry } from '../services/milkService';
 
 export const createMilkEntry = async (req: Request, res: Response): Promise<void> => {
   try {
     const { 
       farmerId, date, shift, milkType, quantity, 
-      fat, snf, clr, notes, mawaYield, mawaRatePerKg 
+      fat, snf, clr, notes, mawaYield, mawaRatePerKg,
+      aiVerification 
     } = req.body;
 
     if (!farmerId || !shift || !milkType || !quantity) {
@@ -87,10 +89,39 @@ export const createMilkEntry = async (req: Request, res: Response): Promise<void
       rate,
       amount,
       operator: req.user?.id,
-      notes
+      notes,
+      aiVerification: aiVerification || undefined
     });
 
     await entry.save();
+
+    // If AI verification was performed, log to CameraAuditLog for owner's accuracy/mismatch scorecard
+    if (aiVerification && (aiVerification.aiDetected || aiVerification.isMismatched)) {
+      try {
+        await CameraAuditLog.create({
+          tenantId: req.tenantId,
+          eventType: 'MILK_OCR_AUDIT',
+          timestamp: targetDate,
+          farmer: farmerDoc._id,
+          personName: farmerDoc.name,
+          farmerIdCode: farmerDoc.farmerId,
+          aiReading: aiVerification.aiDetected,
+          operatorReading: {
+            weight: quantity,
+            fat: fat || 0,
+            snf: snf || 0
+          },
+          isMismatched: !!aiVerification.isMismatched,
+          mismatchReason: aiVerification.mismatchReason || '',
+          snapshotImage: aiVerification.snapshotImage || '',
+          status: aiVerification.isMismatched ? 'MISMATCH' : 'VERIFIED',
+          operatorUser: req.user?.id,
+          notes: `Milk collection entry #${entry._id} - ${farmerDoc.name}`
+        });
+      } catch (logErr) {
+        console.warn('Failed to save CameraAuditLog for milk entry:', logErr);
+      }
+    }
 
     // Create Raw Milk inventory credit
     await InventoryTransaction.create({
