@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const voiceController_1 = require("../controllers/voiceController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const closeDayMiddleware_1 = require("../middleware/closeDayMiddleware");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authenticate);
+router.post('/parse-command', voiceController_1.parseVoiceCommand);
+router.post('/execute-command', closeDayMiddleware_1.checkDayClosed, voiceController_1.executeVoiceCommand);
+exports.default = router;

@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const bandhiController_1 = require("../controllers/bandhiController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const closeDayMiddleware_1 = require("../middleware/closeDayMiddleware");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authenticate);
+router.get('/', bandhiController_1.getBandhis);
+router.post('/', closeDayMiddleware_1.checkDayClosed, bandhiController_1.createBandhi);
+router.put('/:id', closeDayMiddleware_1.checkDayClosed, bandhiController_1.updateBandhi);
+router.get('/delivery-sheet', bandhiController_1.getDailyDeliverySheet);
+router.post('/delivery-sheet', closeDayMiddleware_1.checkDayClosed, bandhiController_1.saveDailyDeliverySheet);
+exports.default = router;

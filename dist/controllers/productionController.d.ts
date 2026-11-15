@@ -1,0 +1,12 @@
+import { Request, Response } from 'express';
+export declare const getRecipe: (req: Request, res: Response) => Promise<void>;
+export declare const updateRecipe: (req: Request, res: Response) => Promise<void>;
+export declare const estimateYield: (req: Request, res: Response) => Promise<void>;
+export declare const createBatch: (req: Request, res: Response) => Promise<void>;
+export declare const completeBatch: (req: Request, res: Response) => Promise<void>;
+export declare const getBatches: (req: Request, res: Response) => Promise<void>;
+export declare const getYieldStats: (req: Request, res: Response) => Promise<void>;
+export declare const getLiveStockStatus: (req: Request, res: Response) => Promise<void>;
+export declare const recordConversion: (req: Request, res: Response) => Promise<void>;
+export declare const getConversionHistory: (req: Request, res: Response) => Promise<void>;
+export declare const adjustProductStock: (req: Request, res: Response) => Promise<void>;

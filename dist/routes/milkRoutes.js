@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const milkController_1 = require("../controllers/milkController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const closeDayMiddleware_1 = require("../middleware/closeDayMiddleware");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authenticate);
+router.post('/collections', closeDayMiddleware_1.checkDayClosed, milkController_1.createMilkEntry);
+router.get('/collections', milkController_1.getMilkCollections);
+router.get('/collections/summary', milkController_1.getMilkSummary);
+router.post('/rate-charts', closeDayMiddleware_1.checkDayClosed, milkController_1.createRateChart);
+router.get('/rate-charts', milkController_1.getRateCharts);
+exports.default = router;

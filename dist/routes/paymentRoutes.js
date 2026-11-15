@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const paymentController_1 = require("../controllers/paymentController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const closeDayMiddleware_1 = require("../middleware/closeDayMiddleware");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authenticate);
+router.post('/advance', closeDayMiddleware_1.checkDayClosed, paymentController_1.giveAdvance);
+router.post('/pay', closeDayMiddleware_1.checkDayClosed, paymentController_1.makePayment);
+router.post('/settle', closeDayMiddleware_1.checkDayClosed, paymentController_1.settleAccount);
+router.get('/settlement-cycle-sheet', paymentController_1.getSettlementCycleSheet);
+router.get('/settlement/:id', paymentController_1.getSettlementById);
+exports.default = router;

@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const udhariController_1 = require("../controllers/udhariController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const closeDayMiddleware_1 = require("../middleware/closeDayMiddleware");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authenticate);
+router.get('/customers', udhariController_1.getDueCustomers);
+router.get('/customer/:customerId/ledger', udhariController_1.getCustomerLedgerStatement);
+router.post('/collect', closeDayMiddleware_1.checkDayClosed, udhariController_1.collectDuePayment);
+exports.default = router;

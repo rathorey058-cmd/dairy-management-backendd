@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const reportController_1 = require("../controllers/reportController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authenticate);
+router.post('/close-day', reportController_1.closeDay);
+router.get('/status/:date', reportController_1.getClosingStatus);
+router.get('/closings', reportController_1.getDailyClosingHistory);
+router.get('/export/daily', reportController_1.generateDailyExcel);
+exports.default = router;

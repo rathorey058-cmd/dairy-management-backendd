@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const farmerController_1 = require("../controllers/farmerController");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const router = (0, express_1.Router)();
+router.use(authMiddleware_1.authenticate);
+router.get('/', farmerController_1.getFarmers);
+router.post('/', farmerController_1.createFarmer);
+router.get('/:id', farmerController_1.getFarmerById);
+router.patch('/:id', farmerController_1.updateFarmer);
+router.put('/:id', farmerController_1.updateFarmer);
+router.get('/:id/ledger', farmerController_1.getFarmerLedger);
+router.get('/:id/milk', farmerController_1.getFarmerMilkHistory);
+exports.default = router;
