@@ -80,16 +80,28 @@ exports.deletePersonProfile = deletePersonProfile;
 // ============================================================================
 // 2. TIME-CUSTOMIZED FULL DAY & INTERVAL SALES / GALLA REPORT
 // ============================================================================
+const parseDateParts = (dateStr) => {
+    const parts = dateStr.split(/[-/]/).map(Number);
+    if (parts.length === 3) {
+        if (parts[0] > 1000)
+            return { y: parts[0], m: parts[1], d: parts[2] };
+        if (parts[2] > 1000)
+            return { y: parts[2], m: parts[1], d: parts[0] };
+    }
+    const now = new Date();
+    return { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
+};
 const getTimeIntervalGallaReport = async (req, res) => {
     try {
         const tenantId = req.tenantId || req.user?.tenantId;
         const { date, startTime = '00:00', endTime = '23:59' } = req.query;
         const baseDateStr = typeof date === 'string' && date ? date : new Date().toISOString().split('T')[0];
+        const { y, m, d } = parseDateParts(baseDateStr);
         const [startH, startM] = startTime.split(':').map(Number);
         const [endH, endM] = endTime.split(':').map(Number);
         const pad = (n) => (isNaN(n) ? '00' : n.toString().padStart(2, '0'));
-        const startIso = `${baseDateStr}T${pad(startH || 0)}:${pad(startM || 0)}:00+05:30`;
-        const endIso = `${baseDateStr}T${pad(endH !== undefined ? endH : 23)}:${pad(endM !== undefined ? endM : 59)}:59.999+05:30`;
+        const startIso = `${y}-${pad(m)}-${pad(d)}T${pad(startH || 0)}:${pad(startM || 0)}:00+05:30`;
+        const endIso = `${y}-${pad(m)}-${pad(d)}T${pad(endH !== undefined ? endH : 23)}:${pad(endM !== undefined ? endM : 59)}:59.999+05:30`;
         const filterStart = new Date(startIso);
         const filterEnd = new Date(endIso);
         // 1. Fetch Milk Sales in this window

@@ -39,7 +39,9 @@ const parseWhatsAppMessage = async (req, res) => {
         const customerName = customer ? customer.name : (senderMobile ? `Customer (${senderMobile})` : 'WhatsApp Guest');
         // 2. Fetch or ensure products exist
         let products = await ensureDefaultProducts(req.tenantId);
-        const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY;
+        const apiKey = process.env.GEMINI_API_KEY ||
+            process.env.GOOGLE_API_KEY ||
+            process.env.GEMINI_KEY;
         let parsedItems = [];
         // 3. Try Google Gemini AI 1.5 Flash via REST API
         if (apiKey && apiKey.trim() !== '') {

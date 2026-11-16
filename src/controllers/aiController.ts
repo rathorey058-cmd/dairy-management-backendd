@@ -44,7 +44,10 @@ export const parseWhatsAppMessage = async (req: Request, res: Response): Promise
     // 2. Fetch or ensure products exist
     let products = await ensureDefaultProducts(req.tenantId);
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_KEY;
+    const apiKey =
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      process.env.GEMINI_KEY;
     let parsedItems: Array<{ product: any; quantity: number; rate: number; amount: number }> = [];
 
     // 3. Try Google Gemini AI 1.5 Flash via REST API
