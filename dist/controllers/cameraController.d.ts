@@ -63,6 +63,10 @@ export declare const resolveFarmerToken: (req: Request, res: Response) => Promis
  */
 export declare const getLiveCameraSnapshot: (req: Request, res: Response) => Promise<void>;
 /**
+ * Push live DVR snapshot frame from local shop agent/bridge via HTTP REST
+ */
+export declare const pushCameraFrame: (req: Request, res: Response) => Promise<void>;
+/**
  * Get Ultra-Crisp Actionable Incidents
  */
 export declare const getUltraCrispIncidents: (req: Request, res: Response) => Promise<void>;

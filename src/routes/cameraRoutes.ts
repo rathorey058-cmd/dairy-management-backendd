@@ -19,7 +19,8 @@ import {
   updateIncidentStatus,
   evaluateEdgeRules,
   getDpdpComplianceStatus,
-  purgeExpiredData
+  purgeExpiredData,
+  pushCameraFrame
 } from '../controllers/cameraController';
 
 import {
@@ -42,6 +43,9 @@ import {
 } from '../controllers/shopSurveillanceController';
 
 const router = Router();
+
+// Public Frame Ingestion from Local Shop DVR Bridge
+router.post('/:id/push-frame', pushCameraFrame);
 
 router.use(authenticate);
 

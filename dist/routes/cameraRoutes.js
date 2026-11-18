@@ -6,6 +6,8 @@ const cameraController_1 = require("../controllers/cameraController");
 const shopAiController_1 = require("../controllers/shopAiController");
 const shopSurveillanceController_1 = require("../controllers/shopSurveillanceController");
 const router = (0, express_1.Router)();
+// Public Frame Ingestion from Local Shop DVR Bridge
+router.post('/:id/push-frame', cameraController_1.pushCameraFrame);
 router.use(authMiddleware_1.authenticate);
 // 1. Owner & Staff Face Enrollment & Instructions
 router.get('/profiles', shopSurveillanceController_1.getPersonProfiles);

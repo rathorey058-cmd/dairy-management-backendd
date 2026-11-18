@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.purgeExpiredData = exports.getDpdpComplianceStatus = exports.evaluateEdgeRules = exports.updateIncidentStatus = exports.getUltraCrispIncidents = exports.getLiveCameraSnapshot = exports.resolveFarmerToken = exports.deleteShelfBlock = exports.saveShelfBlock = exports.getShelfBlocks = exports.getAuditLogs = exports.getIstDateBounds = exports.detectPersonAndVisits = exports.scanShelfInventory = exports.verifyDualAudit = exports.captureAndAnalyzeOCR = exports.testCameraConnection = exports.deleteCamera = exports.saveCamera = exports.getCameras = void 0;
+exports.purgeExpiredData = exports.getDpdpComplianceStatus = exports.evaluateEdgeRules = exports.updateIncidentStatus = exports.getUltraCrispIncidents = exports.pushCameraFrame = exports.getLiveCameraSnapshot = exports.resolveFarmerToken = exports.deleteShelfBlock = exports.saveShelfBlock = exports.getShelfBlocks = exports.getAuditLogs = exports.getIstDateBounds = exports.detectPersonAndVisits = exports.scanShelfInventory = exports.verifyDualAudit = exports.captureAndAnalyzeOCR = exports.testCameraConnection = exports.deleteCamera = exports.saveCamera = exports.getCameras = void 0;
 const server_1 = require("../server");
 const CameraDevice_1 = require("../models/CameraDevice");
 const KiranaShelf_1 = require("../models/KiranaShelf");
@@ -177,6 +177,21 @@ const testCameraConnection = async (req, res) => {
         if (!cameraConfig || !cameraConfig.ipAddress) {
             res.status(400).json({ message: 'कैमरा IP पता या वैध विवरण आवश्यक है।' });
             return;
+        }
+        // 0. If local DVR bridge has pushed a fresh frame for this camera, return success immediately
+        if (targetId && server_1.liveDvrFrameCache.has(targetId)) {
+            const cached = server_1.liveDvrFrameCache.get(targetId);
+            if (Date.now() - cached.timestamp < 35000) {
+                const snapshotBase64 = `data:${cached.contentType};base64,${cached.buffer.toString('base64')}`;
+                await CameraDevice_1.CameraDevice.findByIdAndUpdate(targetId, { status: 'ONLINE', lastChecked: new Date() });
+                res.json({
+                    success: true,
+                    status: 'ONLINE',
+                    message: `${cameraConfig.deviceType || 'DVR'} (${cameraConfig.brand || 'Hikvision'}) चैनल #${cameraConfig.channel} लाइव रिले से कनेक्टेड है!`,
+                    previewImage: snapshotBase64
+                });
+                return;
+            }
         }
         // Attempt to grab live frame with multi-path DVR probe
         try {
@@ -631,6 +646,31 @@ const getLiveCameraSnapshot = async (req, res) => {
     }
 };
 exports.getLiveCameraSnapshot = getLiveCameraSnapshot;
+/**
+ * Push live DVR snapshot frame from local shop agent/bridge via HTTP REST
+ */
+const pushCameraFrame = async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { base64Data, contentType } = req.body;
+        if (id && base64Data) {
+            const rawBase64 = base64Data.includes('base64,') ? base64Data.split('base64,')[1] : base64Data;
+            const buf = Buffer.from(rawBase64, 'base64');
+            server_1.liveDvrFrameCache.set(id, {
+                buffer: buf,
+                contentType: contentType || 'image/jpeg',
+                timestamp: Date.now()
+            });
+            res.json({ success: true, cachedSize: buf.length });
+            return;
+        }
+        res.status(400).json({ error: 'Missing base64Data' });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+exports.pushCameraFrame = pushCameraFrame;
 /**
  * Get Ultra-Crisp Actionable Incidents
  */

@@ -1,4 +1,4 @@
-import { io } from 'socket.io-client';
+import https from 'https';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -11,22 +11,45 @@ const CLOUD_URL = process.env.CLOUD_BACKEND_URL || 'https://dairy-management-bac
 const MONGODB_URI = process.env.MONGODB_URI;
 
 console.log('🚀 Starting DairySmart AI - Local DVR Bridge Service');
-console.log(`📡 Connecting to Cloud Server: ${CLOUD_URL}`);
+console.log(`📡 Ingestion Destination: ${CLOUD_URL}`);
 
-const socket = io(CLOUD_URL, {
-  transports: ['websocket', 'polling'],
-  reconnectionAttempts: Infinity,
-  reconnectionDelay: 2000
-});
+const pushFrameHttp = (cameraId: string, base64Data: string, contentType: string): Promise<void> => {
+  return new Promise((resolve) => {
+    try {
+      const postData = JSON.stringify({ base64Data, contentType });
+      const u = new URL(`${CLOUD_URL}/api/cameras/${cameraId}/push-frame`);
 
-socket.on('connect', () => {
-  console.log('✅ Connected to Cloud Socket Bridge:', socket.id);
-  socket.emit('dvr:register_bridge', { timestamp: Date.now() });
-});
+      const req = https.request(
+        {
+          hostname: u.hostname,
+          port: u.port || 443,
+          path: u.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(postData)
+          },
+          timeout: 8000
+        },
+        (res) => {
+          res.resume();
+          resolve();
+        }
+      );
 
-socket.on('disconnect', () => {
-  console.warn('⚠️ Disconnected from Cloud Socket Bridge. Reconnecting...');
-});
+      req.on('error', () => resolve());
+      req.on('timeout', () => {
+        req.destroy();
+        resolve();
+      });
+
+      req.write(postData);
+      req.end();
+    } catch (e) {
+      resolve();
+    }
+  });
+};
 
 const runBridge = async () => {
   if (!MONGODB_URI) {
@@ -35,35 +58,34 @@ const runBridge = async () => {
   }
 
   await mongoose.connect(MONGODB_URI);
-  console.log('🍃 Connected to MongoDB Atlas for camera list');
+  console.log('🍃 Connected to MongoDB Atlas');
 
+  let isPumping = false;
   const streamCycle = async () => {
+    if (isPumping) return;
+    isPumping = true;
     try {
-      const cameras = await CameraDevice.find({ status: 'ONLINE' });
+      const cameras = await CameraDevice.find({});
       for (const cam of cameras) {
         try {
           const { buffer, contentType } = await fetchHikvisionSnapshotBuffer(cam as any);
           const base64Data = buffer.toString('base64');
-          socket.emit('dvr:push_frame', {
-            cameraId: cam._id.toString(),
-            channel: cam.channel || 1,
-            base64Data,
-            contentType
-          });
-          // Small micro-delay between camera channels to avoid flooding LAN router
-          await new Promise((r) => setTimeout(r, 150));
+          await pushFrameHttp(cam._id.toString(), base64Data, contentType);
+          console.log(`📸 Pushed live frame: ${cam.name} [Ch #${cam.channel}] (${buffer.length} bytes)`);
+          await new Promise((r) => setTimeout(r, 100));
         } catch (e: any) {
-          // Camera frame fetch error (offline or busy)
+          // Channel offline
         }
       }
     } catch (err: any) {
-      console.warn('Bridge cycle warning:', err.message);
+      console.warn('Bridge cycle notice:', err.message);
+    } finally {
+      isPumping = false;
     }
   };
 
-  // Run cycle every 2.5 seconds
-  console.log('🎥 Live streaming DVR frames to Cloud (Vercel)...');
-  setInterval(streamCycle, 2500);
+  console.log('🎥 Live streaming DVR frames to Cloud (Render & Vercel)...');
+  setInterval(streamCycle, 2000);
   streamCycle();
 };
 

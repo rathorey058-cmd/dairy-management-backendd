@@ -190,6 +190,22 @@ export const testCameraConnection = async (req: Request, res: Response): Promise
       return;
     }
 
+    // 0. If local DVR bridge has pushed a fresh frame for this camera, return success immediately
+    if (targetId && liveDvrFrameCache.has(targetId)) {
+      const cached = liveDvrFrameCache.get(targetId)!;
+      if (Date.now() - cached.timestamp < 35000) {
+        const snapshotBase64 = `data:${cached.contentType};base64,${cached.buffer.toString('base64')}`;
+        await CameraDevice.findByIdAndUpdate(targetId, { status: 'ONLINE', lastChecked: new Date() });
+        res.json({
+          success: true,
+          status: 'ONLINE',
+          message: `${cameraConfig.deviceType || 'DVR'} (${cameraConfig.brand || 'Hikvision'}) चैनल #${cameraConfig.channel} लाइव रिले से कनेक्टेड है!`,
+          previewImage: snapshotBase64
+        });
+        return;
+      }
+    }
+
     // Attempt to grab live frame with multi-path DVR probe
     try {
       const { buffer, contentType, workingPath } = await fetchHikvisionSnapshotBuffer(cameraConfig);
@@ -677,6 +693,30 @@ export const getLiveCameraSnapshot = async (req: Request, res: Response): Promis
     res.send(buffer);
   } catch (err: any) {
     res.status(502).json({ error: err.message });
+  }
+};
+
+/**
+ * Push live DVR snapshot frame from local shop agent/bridge via HTTP REST
+ */
+export const pushCameraFrame = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const { base64Data, contentType } = req.body;
+    if (id && base64Data) {
+      const rawBase64 = base64Data.includes('base64,') ? base64Data.split('base64,')[1] : base64Data;
+      const buf = Buffer.from(rawBase64, 'base64');
+      liveDvrFrameCache.set(id, {
+        buffer: buf,
+        contentType: contentType || 'image/jpeg',
+        timestamp: Date.now()
+      });
+      res.json({ success: true, cachedSize: buf.length });
+      return;
+    }
+    res.status(400).json({ error: 'Missing base64Data' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 };
 
