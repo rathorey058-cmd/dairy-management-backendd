@@ -32,7 +32,14 @@ export declare const scanShelfInventory: (req: Request, res: Response) => Promis
  */
 export declare const detectPersonAndVisits: (req: Request, res: Response) => Promise<void>;
 /**
- * Get AI Accuracy Scorecard and Audit Logs
+ * Helper to get exact Indian Standard Time (IST - UTC+5:30) start & end timestamps
+ */
+export declare const getIstDateBounds: (dateInput: string) => {
+    start: Date;
+    end: Date;
+};
+/**
+ * Get AI Accuracy Scorecard and Audit Logs (Supports Date Filtering without artificial limits)
  */
 export declare const getAuditLogs: (req: Request, res: Response) => Promise<void>;
 /**

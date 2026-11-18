@@ -294,9 +294,11 @@ const generateDailyAiReport = async (req, res) => {
                 d.setDate(d.getDate() - 1);
                 return d.toISOString().split('T')[0];
             })();
-        const [y, m, d] = targetDateStr.split('-').map(Number);
-        const startOfDay = new Date(y, m - 1, d, 0, 0, 0, 0);
-        const endOfDay = new Date(y, m - 1, d, 23, 59, 59, 999);
+        const parts = targetDateStr.split('-').map(Number);
+        // IST start of day: 00:00:00 IST = 18:30:00 UTC previous day (-5.5h)
+        const startOfDay = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+        // IST end of day: 23:59:59.999 IST = 18:29:59.999 UTC current day
+        const endOfDay = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999) - (5.5 * 60 * 60 * 1000));
         // 1. Fetch all Camera Audit Logs & Incidents on that day
         const auditLogs = await CameraAuditLog_1.CameraAuditLog.find({
             tenantId,

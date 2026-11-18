@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.purgeExpiredData = exports.getDpdpComplianceStatus = exports.evaluateEdgeRules = exports.updateIncidentStatus = exports.getUltraCrispIncidents = exports.getLiveCameraSnapshot = exports.resolveFarmerToken = exports.deleteShelfBlock = exports.saveShelfBlock = exports.getShelfBlocks = exports.getAuditLogs = exports.detectPersonAndVisits = exports.scanShelfInventory = exports.verifyDualAudit = exports.captureAndAnalyzeOCR = exports.testCameraConnection = exports.deleteCamera = exports.saveCamera = exports.getCameras = void 0;
+exports.purgeExpiredData = exports.getDpdpComplianceStatus = exports.evaluateEdgeRules = exports.updateIncidentStatus = exports.getUltraCrispIncidents = exports.getLiveCameraSnapshot = exports.resolveFarmerToken = exports.deleteShelfBlock = exports.saveShelfBlock = exports.getShelfBlocks = exports.getAuditLogs = exports.getIstDateBounds = exports.detectPersonAndVisits = exports.scanShelfInventory = exports.verifyDualAudit = exports.captureAndAnalyzeOCR = exports.testCameraConnection = exports.deleteCamera = exports.saveCamera = exports.getCameras = void 0;
 const CameraDevice_1 = require("../models/CameraDevice");
 const KiranaShelf_1 = require("../models/KiranaShelf");
 const CameraAuditLog_1 = require("../models/CameraAuditLog");
@@ -415,37 +415,74 @@ const detectPersonAndVisits = async (req, res) => {
 };
 exports.detectPersonAndVisits = detectPersonAndVisits;
 /**
- * Get AI Accuracy Scorecard and Audit Logs
+ * Helper to get exact Indian Standard Time (IST - UTC+5:30) start & end timestamps
+ */
+const getIstDateBounds = (dateInput) => {
+    const parts = dateInput.trim().split('-');
+    if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        // IST start of day: 00:00:00 IST = 18:30:00 UTC previous day (-5.5h)
+        const start = new Date(Date.UTC(y, m, d, 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+        // IST end of day: 23:59:59.999 IST = 18:29:59.999 UTC current day
+        const end = new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - (5.5 * 60 * 60 * 1000));
+        return { start, end };
+    }
+    const s = new Date(dateInput);
+    s.setHours(0, 0, 0, 0);
+    const e = new Date(dateInput);
+    e.setHours(23, 59, 59, 999);
+    return { start: s, end: e };
+};
+exports.getIstDateBounds = getIstDateBounds;
+/**
+ * Get AI Accuracy Scorecard and Audit Logs (Supports Date Filtering without artificial limits)
  */
 const getAuditLogs = async (req, res) => {
     try {
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
+        const { date, startDate, endDate, limit = 200 } = req.query;
+        const dateFilter = {};
+        if (date && typeof date === 'string' && date.trim() !== '') {
+            const bounds = (0, exports.getIstDateBounds)(date);
+            dateFilter.timestamp = { $gte: bounds.start, $lte: bounds.end };
+        }
+        else if (startDate && endDate) {
+            const startBounds = (0, exports.getIstDateBounds)(startDate);
+            const endBounds = (0, exports.getIstDateBounds)(endDate);
+            dateFilter.timestamp = { $gte: startBounds.start, $lte: endBounds.end };
+        }
         const totalLogs = await CameraAuditLog_1.CameraAuditLog.countDocuments({
             tenantId: req.tenantId,
-            eventType: 'MILK_OCR_AUDIT'
+            eventType: 'MILK_OCR_AUDIT',
+            ...dateFilter
         });
         const totalMismatches = await CameraAuditLog_1.CameraAuditLog.countDocuments({
             tenantId: req.tenantId,
             eventType: 'MILK_OCR_AUDIT',
-            isMismatched: true
+            isMismatched: true,
+            ...dateFilter
         });
         const accuracyRate = totalLogs > 0
             ? Math.round(((totalLogs - totalMismatches) / totalLogs) * 1000) / 10
             : 100.0;
+        const maxLimit = parseInt(limit, 10) || 200;
         const recentMismatches = await CameraAuditLog_1.CameraAuditLog.find({
             tenantId: req.tenantId,
             eventType: 'MILK_OCR_AUDIT',
-            isMismatched: true
-        }).sort({ timestamp: -1 }).limit(10);
+            isMismatched: true,
+            ...dateFilter
+        }).sort({ timestamp: -1 }).limit(maxLimit);
         const recentVisits = await CameraAuditLog_1.CameraAuditLog.find({
             tenantId: req.tenantId,
-            eventType: 'FACE_VISIT'
-        }).sort({ timestamp: -1 }).limit(15);
+            eventType: 'FACE_VISIT',
+            ...dateFilter
+        }).sort({ timestamp: -1 }).limit(maxLimit);
         const shelfLogs = await CameraAuditLog_1.CameraAuditLog.find({
             tenantId: req.tenantId,
-            eventType: 'SHELF_SCAN'
-        }).sort({ timestamp: -1 }).limit(10);
+            eventType: 'SHELF_SCAN',
+            ...dateFilter
+        }).sort({ timestamp: -1 }).limit(maxLimit);
         res.json({
             accuracyRate,
             totalOcrScans: totalLogs,
@@ -602,18 +639,13 @@ const getUltraCrispIncidents = async (req, res) => {
             }
         };
         if (date && typeof date === 'string' && date.trim() !== '') {
-            const s = new Date(date.trim());
-            s.setHours(0, 0, 0, 0);
-            const e = new Date(date.trim());
-            e.setHours(23, 59, 59, 999);
-            filter.timestamp = { $gte: s, $lte: e };
+            const bounds = (0, exports.getIstDateBounds)(date);
+            filter.timestamp = { $gte: bounds.start, $lte: bounds.end };
         }
         else if (startDate && endDate) {
-            const s = new Date(startDate);
-            s.setHours(0, 0, 0, 0);
-            const e = new Date(endDate);
-            e.setHours(23, 59, 59, 999);
-            filter.timestamp = { $gte: s, $lte: e };
+            const startBounds = (0, exports.getIstDateBounds)(startDate);
+            const endBounds = (0, exports.getIstDateBounds)(endDate);
+            filter.timestamp = { $gte: startBounds.start, $lte: endBounds.end };
         }
         if (status && status !== 'ALL') {
             filter['incident.status'] = status;

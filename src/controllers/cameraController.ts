@@ -447,43 +447,81 @@ export const detectPersonAndVisits = async (req: Request, res: Response): Promis
 };
 
 /**
- * Get AI Accuracy Scorecard and Audit Logs
+ * Helper to get exact Indian Standard Time (IST - UTC+5:30) start & end timestamps
+ */
+export const getIstDateBounds = (dateInput: string) => {
+  const parts = dateInput.trim().split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    // IST start of day: 00:00:00 IST = 18:30:00 UTC previous day (-5.5h)
+    const start = new Date(Date.UTC(y, m, d, 0, 0, 0, 0) - (5.5 * 60 * 60 * 1000));
+    // IST end of day: 23:59:59.999 IST = 18:29:59.999 UTC current day
+    const end = new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - (5.5 * 60 * 60 * 1000));
+    return { start, end };
+  }
+  const s = new Date(dateInput);
+  s.setHours(0, 0, 0, 0);
+  const e = new Date(dateInput);
+  e.setHours(23, 59, 59, 999);
+  return { start: s, end: e };
+};
+
+/**
+ * Get AI Accuracy Scorecard and Audit Logs (Supports Date Filtering without artificial limits)
  */
 export const getAuditLogs = async (req: Request, res: Response): Promise<void> => {
   try {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const { date, startDate, endDate, limit = 200 } = req.query;
+    const dateFilter: any = {};
+
+    if (date && typeof date === 'string' && date.trim() !== '') {
+      const bounds = getIstDateBounds(date);
+      dateFilter.timestamp = { $gte: bounds.start, $lte: bounds.end };
+    } else if (startDate && endDate) {
+      const startBounds = getIstDateBounds(startDate as string);
+      const endBounds = getIstDateBounds(endDate as string);
+      dateFilter.timestamp = { $gte: startBounds.start, $lte: endBounds.end };
+    }
 
     const totalLogs = await CameraAuditLog.countDocuments({
       tenantId: req.tenantId,
-      eventType: 'MILK_OCR_AUDIT'
+      eventType: 'MILK_OCR_AUDIT',
+      ...dateFilter
     });
 
     const totalMismatches = await CameraAuditLog.countDocuments({
       tenantId: req.tenantId,
       eventType: 'MILK_OCR_AUDIT',
-      isMismatched: true
+      isMismatched: true,
+      ...dateFilter
     });
 
     const accuracyRate = totalLogs > 0 
       ? Math.round(((totalLogs - totalMismatches) / totalLogs) * 1000) / 10 
       : 100.0;
 
+    const maxLimit = parseInt(limit as string, 10) || 200;
+
     const recentMismatches = await CameraAuditLog.find({
       tenantId: req.tenantId,
       eventType: 'MILK_OCR_AUDIT',
-      isMismatched: true
-    }).sort({ timestamp: -1 }).limit(10);
+      isMismatched: true,
+      ...dateFilter
+    }).sort({ timestamp: -1 }).limit(maxLimit);
 
     const recentVisits = await CameraAuditLog.find({
       tenantId: req.tenantId,
-      eventType: 'FACE_VISIT'
-    }).sort({ timestamp: -1 }).limit(15);
+      eventType: 'FACE_VISIT',
+      ...dateFilter
+    }).sort({ timestamp: -1 }).limit(maxLimit);
 
     const shelfLogs = await CameraAuditLog.find({
       tenantId: req.tenantId,
-      eventType: 'SHELF_SCAN'
-    }).sort({ timestamp: -1 }).limit(10);
+      eventType: 'SHELF_SCAN',
+      ...dateFilter
+    }).sort({ timestamp: -1 }).limit(maxLimit);
 
     res.json({
       accuracyRate,
@@ -650,17 +688,12 @@ export const getUltraCrispIncidents = async (req: Request, res: Response): Promi
     };
 
     if (date && typeof date === 'string' && date.trim() !== '') {
-      const s = new Date(date.trim());
-      s.setHours(0, 0, 0, 0);
-      const e = new Date(date.trim());
-      e.setHours(23, 59, 59, 999);
-      filter.timestamp = { $gte: s, $lte: e };
+      const bounds = getIstDateBounds(date);
+      filter.timestamp = { $gte: bounds.start, $lte: bounds.end };
     } else if (startDate && endDate) {
-      const s = new Date(startDate as string);
-      s.setHours(0, 0, 0, 0);
-      const e = new Date(endDate as string);
-      e.setHours(23, 59, 59, 999);
-      filter.timestamp = { $gte: s, $lte: e };
+      const startBounds = getIstDateBounds(startDate as string);
+      const endBounds = getIstDateBounds(endDate as string);
+      filter.timestamp = { $gte: startBounds.start, $lte: endBounds.end };
     }
 
     if (status && status !== 'ALL') {
