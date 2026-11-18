@@ -58,6 +58,12 @@ const tenantSchema = new mongoose_1.Schema({
     },
     isOnboardingCompleted: { type: Boolean, default: false },
     geminiApiKey: { type: String },
+    aiPairingConfig: {
+        planTier: { type: String, enum: ['FREE', 'PAID', 'CUSTOM'], default: 'FREE' },
+        allowedBlocksLimit: { type: Number, default: 15 },
+        freeBlocksCount: { type: Number, default: 15 },
+        isPaidPlanActive: { type: Boolean, default: false }
+    },
     status: { type: String, enum: ['Active', 'Trial', 'Suspended'], default: 'Trial' },
     subscriptionPlan: { type: mongoose_1.Schema.Types.ObjectId, ref: 'SubscriptionPlan', required: true },
     subscriptionExpiresAt: { type: Date, required: true }

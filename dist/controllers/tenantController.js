@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.completeOnboarding = exports.updateTenantSettings = exports.getTenantSettings = void 0;
+exports.updateTenantPairingLimitByAdmin = exports.getAllTenantsPairingLimits = exports.getMyPairingQuota = exports.completeOnboarding = exports.updateTenantSettings = exports.getTenantSettings = void 0;
 const Tenant_1 = require("../models/Tenant");
 const MilkRateChart_1 = require("../models/MilkRateChart");
+const VisualPairingBlock_1 = require("../models/VisualPairingBlock");
 /**
  * Get tenant configuration, pricing, settlement cycle, and onboarding status
  */
@@ -54,7 +55,13 @@ const getTenantSettings = async (req, res) => {
                     ]
                 },
                 isOnboardingCompleted: Boolean(tenant.isOnboardingCompleted),
-                geminiApiKey: tenant.geminiApiKey ? '••••••••' + tenant.geminiApiKey.slice(-4) : ''
+                geminiApiKey: tenant.geminiApiKey ? '••••••••' + tenant.geminiApiKey.slice(-4) : '',
+                aiPairingConfig: tenant.aiPairingConfig || {
+                    planTier: 'FREE',
+                    allowedBlocksLimit: 15,
+                    freeBlocksCount: 15,
+                    isPaidPlanActive: false
+                }
             }
         });
     }
@@ -182,3 +189,129 @@ const completeOnboarding = async (req, res) => {
     }
 };
 exports.completeOnboarding = completeOnboarding;
+/**
+ * Get current tenant's AI pairing quota & usage
+ */
+const getMyPairingQuota = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        if (!tenantId) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const tenant = await Tenant_1.Tenant.findById(tenantId).select('name aiPairingConfig status');
+        if (!tenant) {
+            res.status(404).json({ message: 'Tenant not found' });
+            return;
+        }
+        const config = tenant.aiPairingConfig || {
+            planTier: 'FREE',
+            allowedBlocksLimit: 15,
+            freeBlocksCount: 15,
+            isPaidPlanActive: false
+        };
+        const usedBlocksCount = await VisualPairingBlock_1.VisualPairingBlock.countDocuments({ tenantId });
+        const allowedLimit = config.allowedBlocksLimit || 15;
+        const remainingBlocks = Math.max(0, allowedLimit - usedBlocksCount);
+        res.json({
+            success: true,
+            quota: {
+                planTier: config.planTier,
+                allowedBlocksLimit: allowedLimit,
+                freeBlocksCount: config.freeBlocksCount || 15,
+                isPaidPlanActive: Boolean(config.isPaidPlanActive),
+                usedBlocksCount,
+                remainingBlocks,
+                canAddBlock: usedBlocksCount < allowedLimit
+            }
+        });
+    }
+    catch (err) {
+        console.error('getMyPairingQuota error:', err);
+        res.status(500).json({ message: 'Error fetching pairing quota', error: err.message });
+    }
+};
+exports.getMyPairingQuota = getMyPairingQuota;
+/**
+ * SUPER ADMIN: List all tenants and their AI Visual Pairing limits
+ */
+const getAllTenantsPairingLimits = async (req, res) => {
+    try {
+        const tenants = await Tenant_1.Tenant.find({})
+            .select('name ownerName mobile email status aiPairingConfig createdAt')
+            .sort({ createdAt: -1 });
+        const tenantsWithUsage = await Promise.all(tenants.map(async (t) => {
+            const usedBlocksCount = await VisualPairingBlock_1.VisualPairingBlock.countDocuments({ tenantId: t._id });
+            const config = t.aiPairingConfig || {
+                planTier: 'FREE',
+                allowedBlocksLimit: 15,
+                freeBlocksCount: 15,
+                isPaidPlanActive: false
+            };
+            return {
+                id: t._id,
+                name: t.name,
+                ownerName: t.ownerName,
+                mobile: t.mobile,
+                email: t.email,
+                status: t.status,
+                planTier: config.planTier || 'FREE',
+                allowedBlocksLimit: config.allowedBlocksLimit || 15,
+                freeBlocksCount: config.freeBlocksCount || 15,
+                isPaidPlanActive: Boolean(config.isPaidPlanActive),
+                usedBlocksCount,
+                remainingBlocks: Math.max(0, (config.allowedBlocksLimit || 15) - usedBlocksCount)
+            };
+        }));
+        res.json({
+            success: true,
+            tenants: tenantsWithUsage
+        });
+    }
+    catch (err) {
+        console.error('getAllTenantsPairingLimits error:', err);
+        res.status(500).json({ message: 'Error retrieving pairing limits', error: err.message });
+    }
+};
+exports.getAllTenantsPairingLimits = getAllTenantsPairingLimits;
+/**
+ * SUPER ADMIN: Update a tenant's AI pairing block limits & plan tier
+ */
+const updateTenantPairingLimitByAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { planTier, allowedBlocksLimit, freeBlocksCount, isPaidPlanActive } = req.body;
+        const tenant = await Tenant_1.Tenant.findById(id);
+        if (!tenant) {
+            res.status(404).json({ message: 'Tenant not found' });
+            return;
+        }
+        const currentConfig = tenant.aiPairingConfig || {
+            planTier: 'FREE',
+            allowedBlocksLimit: 15,
+            freeBlocksCount: 15,
+            isPaidPlanActive: false
+        };
+        const newPlanTier = planTier || currentConfig.planTier || 'FREE';
+        const newLimit = allowedBlocksLimit !== undefined ? Number(allowedBlocksLimit) : (currentConfig.allowedBlocksLimit || 15);
+        const newFreeCount = freeBlocksCount !== undefined ? Number(freeBlocksCount) : (currentConfig.freeBlocksCount || 15);
+        const newIsPaid = isPaidPlanActive !== undefined ? Boolean(isPaidPlanActive) : Boolean(currentConfig.isPaidPlanActive);
+        tenant.aiPairingConfig = {
+            planTier: newPlanTier,
+            allowedBlocksLimit: newLimit,
+            freeBlocksCount: newFreeCount,
+            isPaidPlanActive: newIsPaid
+        };
+        await tenant.save();
+        res.json({
+            success: true,
+            message: `Tenant "${tenant.name}" AI pairing limits updated successfully`,
+            aiPairingConfig: tenant.aiPairingConfig
+        });
+    }
+    catch (err) {
+        console.error('updateTenantPairingLimitByAdmin error:', err);
+        res.status(500).json({ message: 'Error updating tenant limit', error: err.message });
+    }
+};
+exports.updateTenantPairingLimitByAdmin = updateTenantPairingLimitByAdmin;

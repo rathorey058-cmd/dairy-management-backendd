@@ -20,7 +20,13 @@ import {
   evaluateEdgeRules,
   getDpdpComplianceStatus,
   purgeExpiredData,
-  pushCameraFrame
+  pushCameraFrame,
+  getVisualPairingBlocks,
+  saveVisualPairingBlock,
+  deleteVisualPairingBlock,
+  recordShelfPickEvent,
+  recordGateMovement,
+  getReusableCansSummary
 } from '../controllers/cameraController';
 
 import {
@@ -103,6 +109,14 @@ router.post('/evaluate-edge-rules', evaluateEdgeRules);
 // DPDP Act 2023 Compliance & Retention Routes
 router.get('/dpdp/status', getDpdpComplianceStatus);
 router.post('/dpdp/purge', purgeExpiredData);
+
+// Smart Visual Pairing Blocks & Asset Tagging Routes
+router.get('/pairing-blocks', getVisualPairingBlocks);
+router.post('/pairing-blocks', saveVisualPairingBlock);
+router.delete('/pairing-blocks/:id', deleteVisualPairingBlock);
+router.post('/pairing-blocks/:id/record-pick', recordShelfPickEvent);
+router.post('/pairing-blocks/:id/record-gate', recordGateMovement);
+router.get('/pairing-blocks/reusable-summary', getReusableCansSummary);
 
 // Instant Token Resolver
 router.get('/resolve-token', resolveFarmerToken);

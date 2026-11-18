@@ -52,6 +52,13 @@ router.post('/evaluate-edge-rules', cameraController_1.evaluateEdgeRules);
 // DPDP Act 2023 Compliance & Retention Routes
 router.get('/dpdp/status', cameraController_1.getDpdpComplianceStatus);
 router.post('/dpdp/purge', cameraController_1.purgeExpiredData);
+// Smart Visual Pairing Blocks & Asset Tagging Routes
+router.get('/pairing-blocks', cameraController_1.getVisualPairingBlocks);
+router.post('/pairing-blocks', cameraController_1.saveVisualPairingBlock);
+router.delete('/pairing-blocks/:id', cameraController_1.deleteVisualPairingBlock);
+router.post('/pairing-blocks/:id/record-pick', cameraController_1.recordShelfPickEvent);
+router.post('/pairing-blocks/:id/record-gate', cameraController_1.recordGateMovement);
+router.get('/pairing-blocks/reusable-summary', cameraController_1.getReusableCansSummary);
 // Instant Token Resolver
 router.get('/resolve-token', cameraController_1.resolveFarmerToken);
 exports.default = router;

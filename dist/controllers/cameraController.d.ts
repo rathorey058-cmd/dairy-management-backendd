@@ -87,3 +87,32 @@ export declare const getDpdpComplianceStatus: (req: Request, res: Response) => P
  * DPDP Act 2023 Data Purge - Deletes expired video incident recordings
  */
 export declare const purgeExpiredData: (req: Request, res: Response) => Promise<void>;
+/**
+ * -------------------------------------------------------------
+ * SMART VISUAL PAIRING BLOCKS & ASSET TAGGING ENGINE
+ * -------------------------------------------------------------
+ */
+/**
+ * Get all Visual Pairing Blocks for tenant with quota info
+ */
+export declare const getVisualPairingBlocks: (req: Request, res: Response) => Promise<void>;
+/**
+ * Add or update a Visual Pairing Block with Plan Tier Quota Enforcement
+ */
+export declare const saveVisualPairingBlock: (req: Request, res: Response) => Promise<void>;
+/**
+ * Delete a Visual Pairing Block
+ */
+export declare const deleteVisualPairingBlock: (req: Request, res: Response) => Promise<void>;
+/**
+ * Record a Shelf Pick Event (Motion/Reach in Shelf Area)
+ */
+export declare const recordShelfPickEvent: (req: Request, res: Response) => Promise<void>;
+/**
+ * Record Gate Movement (Tripwire Green IN / Red OUT crossing)
+ */
+export declare const recordGateMovement: (req: Request, res: Response) => Promise<void>;
+/**
+ * Reusable Cans & Gate Tripwire Daily Summary
+ */
+export declare const getReusableCansSummary: (req: Request, res: Response) => Promise<void>;

@@ -6,6 +6,12 @@ export interface IMicrophoneDevice {
     deviceId?: string;
     enabled: boolean;
 }
+export interface ITenantAiPairingConfig {
+    planTier: 'FREE' | 'PAID' | 'CUSTOM';
+    allowedBlocksLimit: number;
+    freeBlocksCount: number;
+    isPaidPlanActive: boolean;
+}
 export interface ITenantPricingConfig {
     cowBaseRatePerFat: number;
     cowBaseRatePerSnf: number;
@@ -49,6 +55,7 @@ export interface ITenant {
     isOnboardingCompleted: boolean;
     status: 'Active' | 'Trial' | 'Suspended';
     geminiApiKey?: string;
+    aiPairingConfig?: ITenantAiPairingConfig;
     subscriptionPlan: Types.ObjectId;
     subscriptionExpiresAt: Date;
 }

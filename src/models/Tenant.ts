@@ -8,6 +8,13 @@ export interface IMicrophoneDevice {
   enabled: boolean;
 }
 
+export interface ITenantAiPairingConfig {
+  planTier: 'FREE' | 'PAID' | 'CUSTOM';
+  allowedBlocksLimit: number; // e.g. 15 for Free, 60+ for Paid
+  freeBlocksCount: number;    // Default 15
+  isPaidPlanActive: boolean;
+}
+
 export interface ITenantPricingConfig {
   cowBaseRatePerFat: number;
   cowBaseRatePerSnf: number;
@@ -54,6 +61,7 @@ export interface ITenant {
   isOnboardingCompleted: boolean;
   status: 'Active' | 'Trial' | 'Suspended';
   geminiApiKey?: string;
+  aiPairingConfig?: ITenantAiPairingConfig;
   subscriptionPlan: Types.ObjectId; // Ref SubscriptionPlan
   subscriptionExpiresAt: Date;
 }
@@ -115,6 +123,12 @@ const tenantSchema = new Schema<ITenant>({
   },
   isOnboardingCompleted: { type: Boolean, default: false },
   geminiApiKey: { type: String },
+  aiPairingConfig: {
+    planTier: { type: String, enum: ['FREE', 'PAID', 'CUSTOM'], default: 'FREE' },
+    allowedBlocksLimit: { type: Number, default: 15 },
+    freeBlocksCount: { type: Number, default: 15 },
+    isPaidPlanActive: { type: Boolean, default: false }
+  },
   status: { type: String, enum: ['Active', 'Trial', 'Suspended'], default: 'Trial' },
   subscriptionPlan: { type: Schema.Types.ObjectId, ref: 'SubscriptionPlan', required: true },
   subscriptionExpiresAt: { type: Date, required: true }

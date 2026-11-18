@@ -1,11 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.purgeExpiredData = exports.getDpdpComplianceStatus = exports.evaluateEdgeRules = exports.updateIncidentStatus = exports.getUltraCrispIncidents = exports.pushCameraFrame = exports.getLiveCameraSnapshot = exports.resolveFarmerToken = exports.deleteShelfBlock = exports.saveShelfBlock = exports.getShelfBlocks = exports.getAuditLogs = exports.getIstDateBounds = exports.detectPersonAndVisits = exports.scanShelfInventory = exports.verifyDualAudit = exports.captureAndAnalyzeOCR = exports.testCameraConnection = exports.deleteCamera = exports.saveCamera = exports.getCameras = void 0;
+exports.getReusableCansSummary = exports.recordGateMovement = exports.recordShelfPickEvent = exports.deleteVisualPairingBlock = exports.saveVisualPairingBlock = exports.getVisualPairingBlocks = exports.purgeExpiredData = exports.getDpdpComplianceStatus = exports.evaluateEdgeRules = exports.updateIncidentStatus = exports.getUltraCrispIncidents = exports.pushCameraFrame = exports.getLiveCameraSnapshot = exports.resolveFarmerToken = exports.deleteShelfBlock = exports.saveShelfBlock = exports.getShelfBlocks = exports.getAuditLogs = exports.getIstDateBounds = exports.detectPersonAndVisits = exports.scanShelfInventory = exports.verifyDualAudit = exports.captureAndAnalyzeOCR = exports.testCameraConnection = exports.deleteCamera = exports.saveCamera = exports.getCameras = void 0;
 const server_1 = require("../server");
 const CameraDevice_1 = require("../models/CameraDevice");
 const KiranaShelf_1 = require("../models/KiranaShelf");
 const CameraAuditLog_1 = require("../models/CameraAuditLog");
 const Farmer_1 = require("../models/Farmer");
+const VisualPairingBlock_1 = require("../models/VisualPairingBlock");
+const Tenant_1 = require("../models/Tenant");
 const cameraService_1 = require("../services/cameraService");
 /**
  * Get all configured cameras
@@ -962,3 +964,241 @@ const purgeExpiredData = async (req, res) => {
     }
 };
 exports.purgeExpiredData = purgeExpiredData;
+/**
+ * -------------------------------------------------------------
+ * SMART VISUAL PAIRING BLOCKS & ASSET TAGGING ENGINE
+ * -------------------------------------------------------------
+ */
+/**
+ * Get all Visual Pairing Blocks for tenant with quota info
+ */
+const getVisualPairingBlocks = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const { cameraChannel, category } = req.query;
+        const filter = { tenantId };
+        if (cameraChannel)
+            filter.cameraChannel = Number(cameraChannel);
+        if (category)
+            filter.category = category;
+        const blocks = await VisualPairingBlock_1.VisualPairingBlock.find(filter).sort({ createdAt: -1 });
+        const tenant = await Tenant_1.Tenant.findById(tenantId);
+        const allowedLimit = tenant?.aiPairingConfig?.allowedBlocksLimit || 15;
+        const planTier = tenant?.aiPairingConfig?.planTier || 'FREE';
+        res.json({
+            success: true,
+            blocks,
+            quota: {
+                used: blocks.length,
+                allowedLimit,
+                planTier,
+                remaining: Math.max(0, allowedLimit - blocks.length)
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ message: 'Error fetching visual pairing blocks', error: error.message });
+    }
+};
+exports.getVisualPairingBlocks = getVisualPairingBlocks;
+/**
+ * Add or update a Visual Pairing Block with Plan Tier Quota Enforcement
+ */
+const saveVisualPairingBlock = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const { id, blockCode, name, category, color, barcode, cameraChannel, coordinates, tripwireConfig, shelfConfig, gateStatus, status, notes } = req.body;
+        if (!blockCode || !name) {
+            res.status(400).json({ message: 'Block Code और Name अनिवार्य हैं।' });
+            return;
+        }
+        // Check quota for new blocks
+        if (!id) {
+            const tenant = await Tenant_1.Tenant.findById(tenantId);
+            const allowedLimit = tenant?.aiPairingConfig?.allowedBlocksLimit || 15;
+            const currentBlocksCount = await VisualPairingBlock_1.VisualPairingBlock.countDocuments({ tenantId });
+            if (currentBlocksCount >= allowedLimit) {
+                res.status(403).json({
+                    success: false,
+                    message: `ब्लॉक लिमिट समाप्त हो गई है! आपका प्लान ${tenant?.aiPairingConfig?.planTier || 'FREE'} है (अधिकतम ${allowedLimit} ब्लॉक्स)। कृपया सुपर एडमिन से संपर्क करके अधिक ब्लॉक्स अनलॉक करवाएं।`,
+                    quota: {
+                        used: currentBlocksCount,
+                        allowedLimit,
+                        planTier: tenant?.aiPairingConfig?.planTier || 'FREE'
+                    }
+                });
+                return;
+            }
+        }
+        const payload = {
+            tenantId,
+            blockCode: blockCode.trim().toUpperCase(),
+            name: name.trim(),
+            category: category || 'CUSTOM',
+            color: color || '#3B82F6',
+            barcode: barcode ? barcode.trim() : undefined,
+            cameraChannel: cameraChannel ? Number(cameraChannel) : 1,
+            coordinates: coordinates || { x: 10, y: 10, width: 20, height: 20 },
+            tripwireConfig,
+            shelfConfig,
+            gateStatus,
+            status: status || 'ACTIVE',
+            notes
+        };
+        let block;
+        if (id) {
+            block = await VisualPairingBlock_1.VisualPairingBlock.findOneAndUpdate({ _id: id, tenantId }, { $set: payload }, { new: true });
+        }
+        else {
+            block = await VisualPairingBlock_1.VisualPairingBlock.findOneAndUpdate({ tenantId, blockCode: payload.blockCode }, { $set: payload }, { upsert: true, new: true });
+        }
+        res.json({
+            success: true,
+            message: 'Visual Pairing Block सुरक्षित रूप से सहेजा गया।',
+            block
+        });
+    }
+    catch (error) {
+        console.error('saveVisualPairingBlock error:', error);
+        res.status(500).json({ message: 'Error saving visual pairing block', error: error.message });
+    }
+};
+exports.saveVisualPairingBlock = saveVisualPairingBlock;
+/**
+ * Delete a Visual Pairing Block
+ */
+const deleteVisualPairingBlock = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await VisualPairingBlock_1.VisualPairingBlock.findOneAndDelete({ _id: id, tenantId: req.tenantId });
+        res.json({ success: true, message: 'Block सफलतापूर्वक हटाया गया।' });
+    }
+    catch (error) {
+        res.status(500).json({ message: 'Error deleting block', error: error.message });
+    }
+};
+exports.deleteVisualPairingBlock = deleteVisualPairingBlock;
+/**
+ * Record a Shelf Pick Event (Motion/Reach in Shelf Area)
+ */
+const recordShelfPickEvent = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { count = 1 } = req.body;
+        const block = await VisualPairingBlock_1.VisualPairingBlock.findOneAndUpdate({ _id: id, tenantId: req.tenantId }, {
+            $inc: { 'shelfConfig.pickCount': Number(count), totalPicks: Number(count) },
+            $set: { 'shelfConfig.lastPickAt': new Date(), lastDetectedAt: new Date() }
+        }, { new: true });
+        if (!block) {
+            res.status(404).json({ message: 'Shelf Block नहीं मिला।' });
+            return;
+        }
+        res.json({
+            success: true,
+            message: `शेल्फ से सामान उठाया गया (+${count})`,
+            pickCount: block.shelfConfig?.pickCount || block.totalPicks,
+            block
+        });
+    }
+    catch (error) {
+        res.status(500).json({ message: 'Error recording shelf pick', error: error.message });
+    }
+};
+exports.recordShelfPickEvent = recordShelfPickEvent;
+/**
+ * Record Gate Movement (Tripwire Green IN / Red OUT crossing)
+ */
+const recordGateMovement = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { direction, isBilled = true } = req.body; // direction: 'IN' | 'OUT'
+        const block = await VisualPairingBlock_1.VisualPairingBlock.findOne({ _id: id, tenantId: req.tenantId });
+        if (!block) {
+            res.status(404).json({ message: 'Container / Block नहीं मिला।' });
+            return;
+        }
+        const now = new Date();
+        if (direction === 'OUT') {
+            block.gateStatus = {
+                status: 'OUTSIDE_SHOP',
+                lastExitTime: now,
+                lastReturnTime: block.gateStatus?.lastReturnTime,
+                exitCountToday: (block.gateStatus?.exitCountToday || 0) + 1,
+                returnCountToday: block.gateStatus?.returnCountToday || 0
+            };
+            block.status = 'OUT_OF_SHOP';
+            // Occlusion / Gate Theft Check: If unbilled asset crosses Red Line OUT
+            if (!isBilled) {
+                await CameraAuditLog_1.CameraAuditLog.create({
+                    tenantId: req.tenantId,
+                    eventType: 'COUNTER_CROSSING',
+                    timestamp: now,
+                    isMismatched: true,
+                    status: 'MISMATCH',
+                    notes: `⚠️ [अलर्ट] अनबिल्ड एसेट '${block.name}' (${block.blockCode}) गेट की रेड-लाइन पार कर दुकान से बाहर गया!`,
+                    incident: {
+                        timeCode: now.toTimeString().split(' ')[0],
+                        alertType: '🚨 गेट चोरी अलर्ट (Unbilled Exit)',
+                        amountOrItem: block.name,
+                        rootCause: `अनबिल्ड एसेट '${block.name}' (${block.blockCode}) गेट की रेड-लाइन पार कर दुकान से बाहर गया`,
+                        confidence: 96,
+                        audioVerified: false,
+                        status: 'FLAGGED_THEFT'
+                    }
+                });
+            }
+        }
+        else {
+            // IN direction (Green Line crossing)
+            block.gateStatus = {
+                status: 'INSIDE_SHOP',
+                lastExitTime: block.gateStatus?.lastExitTime,
+                lastReturnTime: now,
+                exitCountToday: block.gateStatus?.exitCountToday || 0,
+                returnCountToday: (block.gateStatus?.returnCountToday || 0) + 1
+            };
+            block.status = 'ACTIVE';
+        }
+        block.lastDetectedAt = now;
+        await block.save();
+        res.json({
+            success: true,
+            message: `गेट मूवमेंट दर्ज: ${direction === 'OUT' ? 'दुकान से बाहर (OUT)' : 'दुकान में वापस (IN)'}`,
+            gateStatus: block.gateStatus,
+            block
+        });
+    }
+    catch (error) {
+        res.status(500).json({ message: 'Error recording gate movement', error: error.message });
+    }
+};
+exports.recordGateMovement = recordGateMovement;
+/**
+ * Reusable Cans & Gate Tripwire Daily Summary
+ */
+const getReusableCansSummary = async (req, res) => {
+    try {
+        const tenantId = req.tenantId;
+        const cans = await VisualPairingBlock_1.VisualPairingBlock.find({
+            tenantId,
+            category: 'REUSABLE_CAN'
+        }).sort({ updatedAt: -1 });
+        const totalCans = cans.length;
+        const insideShop = cans.filter(c => c.gateStatus?.status === 'INSIDE_SHOP' || c.status === 'ACTIVE').length;
+        const outsideShop = cans.filter(c => c.gateStatus?.status === 'OUTSIDE_SHOP' || c.status === 'OUT_OF_SHOP').length;
+        res.json({
+            success: true,
+            summary: {
+                totalCans,
+                insideShop,
+                outsideShop,
+                missingAlert: outsideShop > 0 ? `चेतावनी: ${outsideShop} कैन अभी तक दुकान में वापस नहीं आए हैं!` : null
+            },
+            cans
+        });
+    }
+    catch (error) {
+        res.status(500).json({ message: 'Error retrieving reusable cans summary', error: error.message });
+    }
+};
+exports.getReusableCansSummary = getReusableCansSummary;
