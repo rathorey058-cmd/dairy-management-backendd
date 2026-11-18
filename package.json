@@ -28,6 +28,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.9.4",
     "socket.io": "^4.8.4",
+    "socket.io-client": "^4.8.4",
     "typescript": "^5.5.4"
   },
   "devDependencies": {

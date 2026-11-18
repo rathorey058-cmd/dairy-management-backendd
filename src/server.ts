@@ -23,6 +23,9 @@ const startKeepAlivePinger = () => {
   }, PING_INTERVAL_MS);
 };
 
+// Live DVR Cloud Frame Cache (CameraId -> Buffer)
+export const liveDvrFrameCache = new Map<string, { buffer: Buffer; contentType: string; timestamp: number }>();
+
 export const io = new SocketIOServer(httpServer, {
   cors: {
     origin: '*',
@@ -31,6 +34,35 @@ export const io = new SocketIOServer(httpServer, {
 });
 
 io.on('connection', (socket) => {
+  // Local Shop DVR Bridge connects & registers
+  socket.on('dvr:register_bridge', (data: { tenantId?: string }) => {
+    console.log(`📹 Local Shop DVR Bridge connected on socket ${socket.id}`);
+  });
+
+  // Local Shop DVR Bridge pushes live snapshots for channels
+  socket.on('dvr:push_frame', (frame: {
+    cameraId: string;
+    channel?: number;
+    base64Data: string;
+    contentType?: string;
+  }) => {
+    if (frame?.cameraId && frame?.base64Data) {
+      try {
+        const rawBase64 = frame.base64Data.includes('base64,')
+          ? frame.base64Data.split('base64,')[1]
+          : frame.base64Data;
+        const buf = Buffer.from(rawBase64, 'base64');
+        liveDvrFrameCache.set(frame.cameraId, {
+          buffer: buf,
+          contentType: frame.contentType || 'image/jpeg',
+          timestamp: Date.now()
+        });
+      } catch (err) {
+        console.warn('Frame cache decode error:', err);
+      }
+    }
+  });
+
   // Delivery Staff joins tenant room
   socket.on('delivery:join', (data: { tenantId: string; staffId: string; staffName: string }) => {
     if (data?.tenantId) {

@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.purgeExpiredData = exports.getDpdpComplianceStatus = exports.evaluateEdgeRules = exports.updateIncidentStatus = exports.getUltraCrispIncidents = exports.getLiveCameraSnapshot = exports.resolveFarmerToken = exports.deleteShelfBlock = exports.saveShelfBlock = exports.getShelfBlocks = exports.getAuditLogs = exports.getIstDateBounds = exports.detectPersonAndVisits = exports.scanShelfInventory = exports.verifyDualAudit = exports.captureAndAnalyzeOCR = exports.testCameraConnection = exports.deleteCamera = exports.saveCamera = exports.getCameras = void 0;
+const server_1 = require("../server");
 const CameraDevice_1 = require("../models/CameraDevice");
 const KiranaShelf_1 = require("../models/KiranaShelf");
 const CameraAuditLog_1 = require("../models/CameraAuditLog");
@@ -606,7 +607,15 @@ exports.resolveFarmerToken = resolveFarmerToken;
  */
 const getLiveCameraSnapshot = async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = req.params.id;
+        // 1. Check if live frame was pushed by local DVR bridge via Socket.io
+        const cached = server_1.liveDvrFrameCache.get(id);
+        if (cached && (Date.now() - cached.timestamp < 35000)) {
+            res.setHeader('Content-Type', cached.contentType);
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.send(cached.buffer);
+            return;
+        }
         const camera = await CameraDevice_1.CameraDevice.findOne({ _id: id, tenantId: req.tenantId });
         if (!camera) {
             res.status(404).send('Camera not found');

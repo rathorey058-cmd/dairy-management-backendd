@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.io = void 0;
+exports.io = exports.liveDvrFrameCache = void 0;
 const http_1 = __importDefault(require("http"));
 const https_1 = __importDefault(require("https"));
 const socket_io_1 = require("socket.io");
@@ -25,6 +25,8 @@ const startKeepAlivePinger = () => {
         });
     }, PING_INTERVAL_MS);
 };
+// Live DVR Cloud Frame Cache (CameraId -> Buffer)
+exports.liveDvrFrameCache = new Map();
 exports.io = new socket_io_1.Server(httpServer, {
     cors: {
         origin: '*',
@@ -32,6 +34,29 @@ exports.io = new socket_io_1.Server(httpServer, {
     }
 });
 exports.io.on('connection', (socket) => {
+    // Local Shop DVR Bridge connects & registers
+    socket.on('dvr:register_bridge', (data) => {
+        console.log(`📹 Local Shop DVR Bridge connected on socket ${socket.id}`);
+    });
+    // Local Shop DVR Bridge pushes live snapshots for channels
+    socket.on('dvr:push_frame', (frame) => {
+        if (frame?.cameraId && frame?.base64Data) {
+            try {
+                const rawBase64 = frame.base64Data.includes('base64,')
+                    ? frame.base64Data.split('base64,')[1]
+                    : frame.base64Data;
+                const buf = Buffer.from(rawBase64, 'base64');
+                exports.liveDvrFrameCache.set(frame.cameraId, {
+                    buffer: buf,
+                    contentType: frame.contentType || 'image/jpeg',
+                    timestamp: Date.now()
+                });
+            }
+            catch (err) {
+                console.warn('Frame cache decode error:', err);
+            }
+        }
+    });
     // Delivery Staff joins tenant room
     socket.on('delivery:join', (data) => {
         if (data?.tenantId) {

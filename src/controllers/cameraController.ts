@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { liveDvrFrameCache } from '../server';
 import { CameraDevice, ICameraDevice } from '../models/CameraDevice';
 import { KiranaShelf } from '../models/KiranaShelf';
 import { CameraAuditLog } from '../models/CameraAuditLog';
@@ -653,7 +654,17 @@ export const resolveFarmerToken = async (req: Request, res: Response): Promise<v
  */
 export const getLiveCameraSnapshot = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
+
+    // 1. Check if live frame was pushed by local DVR bridge via Socket.io
+    const cached = liveDvrFrameCache.get(id);
+    if (cached && (Date.now() - cached.timestamp < 35000)) {
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.send(cached.buffer);
+      return;
+    }
+
     const camera = await CameraDevice.findOne({ _id: id, tenantId: req.tenantId });
     if (!camera) {
       res.status(404).send('Camera not found');
