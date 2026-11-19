@@ -1,6 +1,7 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { authenticate } from '../middleware/authMiddleware';
 import { recorderHeartbeat, getDailySummary } from '../controllers/dailySummaryController';
+import { getTriMatchReport, getAuditImage } from '../controllers/triMatchController';
 import {
   getCameras,
   saveCamera,
@@ -65,6 +66,8 @@ router.delete('/profiles/:id', deletePersonProfile);
 // 2. Time-Interval Sales, Footfall & Galla Report
 router.get('/reports/time-interval', getTimeIntervalGallaReport);
 router.get('/reports/daily-summary', getDailySummary);
+router.get('/reports/tri-match', getTriMatchReport);
+router.get('/audit-log/:id/image', getAuditImage);
 router.post('/recorder-heartbeat', recorderHeartbeat);
 
 // 3. Fridge / Refrigerator Inventory & Night Alerts
