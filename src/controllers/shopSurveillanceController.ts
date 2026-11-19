@@ -183,6 +183,18 @@ export const getTimeIntervalGallaReport = async (req: Request, res: Response): P
     let childrenCount = aiReports.reduce((acc, r) => acc + (r.customerCount?.children || 0), 0);
     const totalAiAlerts = aiReports.reduce((acc, r) => acc + (r.aiBrainInsights?.concernsOrAlerts?.length || 0), 0);
 
+    // Also include Camera Face & Edge Footfall visits
+    const edgeVisitLogs = await CameraAuditLog.find({
+      tenantId,
+      eventType: 'FACE_VISIT',
+      timestamp: { $gte: filterStart, $lte: filterEnd }
+    });
+    const edgeFootfallCount = edgeVisitLogs.reduce((acc, l) => acc + (l.visitCountToday || 1), 0);
+    totalFootfall += edgeFootfallCount;
+    menCount += Math.round(edgeFootfallCount * 0.7);
+    womenCount += Math.round(edgeFootfallCount * 0.2);
+    childrenCount += Math.max(0, edgeFootfallCount - Math.round(edgeFootfallCount * 0.7) - Math.round(edgeFootfallCount * 0.2));
+
     // 5. Fetch Galla Security & Indian Rupee Note detections
     const gallaAuditLogs = await CameraAuditLog.find({
       tenantId,
@@ -252,6 +264,10 @@ export const getTimeIntervalGallaReport = async (req: Request, res: Response): P
         totalGrossSales: Math.round(totalCashCollected + totalDigitalCollected),
         cashOutExpenses: Math.round(cashOut),
         netGallaAmount: Math.round(netGallaChange),
+        aiEstimatedVisualCash: Math.round(aiEstimatedVisualCash),
+        unbilledCashAlert: (totalCashCollected === 0 && aiEstimatedVisualCash > 0)
+          ? `⚠️ [गल्ला विसंगति] POS पर कोई बिल दर्ज नहीं है, किंतु AI कैमरे ने गल्ले में कुल ₹${Math.round(aiEstimatedVisualCash)} के नोट आते देखे हैं!`
+          : null
       },
       salesBreakdown: {
         milkSales: {

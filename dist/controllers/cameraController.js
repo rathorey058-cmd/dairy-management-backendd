@@ -857,11 +857,28 @@ const evaluateEdgeRules = async (req, res) => {
                 eventType,
                 timestamp: new Date(),
                 incident: triggeredIncident,
+                currencyDetails: {
+                    notesDetected: noteInsertedOrDetected > 0 ? [{ note: String(noteInsertedOrDetected), count: 1 }] : [],
+                    totalEstimatedCash: noteInsertedOrDetected || 0,
+                    drawerStatus: drawerOpened ? 'OPENED' : 'CLOSED',
+                    activeBillAmount
+                },
                 snapshotImage,
                 videoClipUrl,
                 status: 'MISMATCH',
                 notes: triggeredIncident.rootCause
             });
+            // If footfall arrivals reported alongside incident
+            if (req.body.footfallArrivals && req.body.footfallArrivals > 0) {
+                await CameraAuditLog_1.CameraAuditLog.create({
+                    tenantId,
+                    eventType: 'FACE_VISIT',
+                    timestamp: new Date(),
+                    visitCountToday: req.body.footfallArrivals,
+                    notes: `AI कैमरा: +${req.body.footfallArrivals} नया ग्राहक काउंटर पर देखा गया।`,
+                    status: 'VERIFIED'
+                });
+            }
             res.json({
                 success: true,
                 triggered: true,
@@ -872,6 +889,18 @@ const evaluateEdgeRules = async (req, res) => {
                     videoClipUrl
                 }
             });
+            return;
+        }
+        if (req.body.footfallArrivals && req.body.footfallArrivals > 0) {
+            await CameraAuditLog_1.CameraAuditLog.create({
+                tenantId,
+                eventType: 'FACE_VISIT',
+                timestamp: new Date(),
+                visitCountToday: req.body.footfallArrivals,
+                notes: `AI कैमरा: +${req.body.footfallArrivals} नया ग्राहक काउंटर पर देखा गया।`,
+                status: 'VERIFIED'
+            });
+            res.json({ success: true, triggered: false, message: `Footfall (+${req.body.footfallArrivals}) recorded successfully.` });
             return;
         }
         res.json({ success: true, triggered: false, message: 'All edge surveillance rules verified safe.' });
