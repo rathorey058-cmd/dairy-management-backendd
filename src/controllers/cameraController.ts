@@ -1,3 +1,5 @@
+import { MilkSale } from '../models/MilkSale';
+import { Order } from '../models/Order';
 import { Request, Response } from 'express';
 import { liveDvrFrameCache } from '../server';
 import { CameraDevice, ICameraDevice } from '../models/CameraDevice';
@@ -832,6 +834,41 @@ export const evaluateEdgeRules = async (req: Request, res: Response): Promise<vo
     const timeCode = new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     let triggeredIncident: any = null;
     let eventType: any = null;
+
+    // Rule 0: AUTO-MATCH drawer opening with POS bills (+-90s) — sent by 24/7 recorder
+    if (req.body.drawerOpened && req.body.autoMatchBill) {
+      const at = req.body.eventAt ? new Date(req.body.eventAt) : new Date();
+      const lo = new Date(at.getTime() - 90000);
+      const hi = new Date(at.getTime() + 90000);
+      const [ms, os] = await Promise.all([
+        MilkSale.find({ tenantId, createdAt: { $gte: lo, $lte: hi } }).select('totalAmount'),
+        Order.find({ tenantId, createdAt: { $gte: lo, $lte: hi } }).select('totalAmount'),
+      ]);
+      const billTotal = [...ms, ...os].reduce((a: number, b: any) => a + (b.totalAmount || 0), 0);
+      const billed = billTotal > 0;
+      const tc = at.toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      await CameraAuditLog.create({
+        tenantId,
+        eventType: billed ? 'GALLA_ALERT' : 'CASH_DRAWER_MISMATCH',
+        timestamp: at,
+        incident: {
+          timeCode: tc,
+          alertType: billed ? 'गल्ला खुला (बिल के साथ)' : '🚨 गल्ला बिना बिल खुला',
+          amountOrItem: billed ? `बिल ₹${Math.round(billTotal)}` : 'बिल: ₹0',
+          rootCause: billed ? 'गल्ला खुलने के आसपास बिल कटा।' : 'गल्ला खुलने के ±90 सेकंड में कोई बिल नहीं कटा।',
+          confidence: 80,
+          audioVerified: false,
+          micChannel: 'Cash Drawer Mic',
+          status: billed ? 'CLEARED_SAFE' : 'PENDING_REVIEW',
+        },
+        currencyDetails: { notesDetected: [], totalEstimatedCash: 0, drawerStatus: 'OPENED', activeBillAmount: billTotal },
+        snapshotImage: req.body.snapshotImage,
+        status: billed ? 'VERIFIED' : 'MISMATCH',
+        notes: billed ? `गल्ला खुला, बिल ₹${Math.round(billTotal)} मिला` : 'गल्ला बिना बिल खुला',
+      } as any);
+      res.json({ success: true, triggered: !billed, billed, billTotal });
+      return;
+    }
 
     // Rule 1: Cash Drawer Mismatch (Galla opened without active POS sale)
     if (drawerOpened && activeBillAmount === 0) {

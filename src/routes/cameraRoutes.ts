@@ -1,5 +1,6 @@
 ﻿import { Router } from 'express';
 import { authenticate } from '../middleware/authMiddleware';
+import { recorderHeartbeat, getDailySummary } from '../controllers/dailySummaryController';
 import {
   getCameras,
   saveCamera,
@@ -63,6 +64,8 @@ router.delete('/profiles/:id', deletePersonProfile);
 
 // 2. Time-Interval Sales, Footfall & Galla Report
 router.get('/reports/time-interval', getTimeIntervalGallaReport);
+router.get('/reports/daily-summary', getDailySummary);
+router.post('/recorder-heartbeat', recorderHeartbeat);
 
 // 3. Fridge / Refrigerator Inventory & Night Alerts
 router.get('/fridge/status', getFridgeStatus);
@@ -124,4 +127,5 @@ router.get('/pairing-blocks/reusable-summary', getReusableCansSummary);
 router.get('/resolve-token', resolveFarmerToken);
 
 export default router;
+
 
