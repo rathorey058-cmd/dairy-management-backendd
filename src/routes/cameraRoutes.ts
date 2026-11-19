@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import { authenticate } from '../middleware/authMiddleware';
 import {
   getCameras,
@@ -45,7 +45,8 @@ import {
   getTimeIntervalGallaReport,
   getFridgeStatus,
   auditFridgeAccess,
-  searchDvrPlayback
+  searchDvrPlayback,
+  getPlaybackTimeline
 } from '../controllers/shopSurveillanceController';
 
 const router = Router();
@@ -69,6 +70,7 @@ router.post('/fridge/audit', auditFridgeAccess);
 
 // 4. In-App DVR Playback (From HDD)
 router.get('/playback/search', searchDvrPlayback);
+router.get('/playback/timeline', getPlaybackTimeline);
 
 // Shop Intelligence, CCTV/Video Upload, Voice Recognition & Live Audits
 router.post('/shop-ai/upload-analyze', analyzeMediaUpload);
@@ -122,3 +124,4 @@ router.get('/pairing-blocks/reusable-summary', getReusableCansSummary);
 router.get('/resolve-token', resolveFarmerToken);
 
 export default router;
+

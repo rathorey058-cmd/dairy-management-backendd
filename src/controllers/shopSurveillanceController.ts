@@ -415,3 +415,45 @@ export const searchDvrPlayback = async (req: Request, res: Response): Promise<vo
     res.status(500).json({ success: false, message: 'DVR प्लेबैक सर्च में त्रुटि आई।', error: error.message });
   }
 };
+
+
+// ============================================================================
+// 5. PLAYBACK TIMELINE (REAL RECORDED AI EVENTS FOR A TIME WINDOW)
+// ============================================================================
+
+export const getPlaybackTimeline = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const tenantId = (req as any).tenantId || (req as any).user?.tenantId;
+    const { date, startTime = '00:00', endTime = '23:59' } = req.query as any;
+    const day = typeof date === 'string' && date ? date : new Date().toISOString().split('T')[0];
+    const from = new Date(`${day}T${startTime}:00+05:30`);
+    const to = new Date(`${day}T${endTime}:59.999+05:30`);
+
+    const logs = await CameraAuditLog.find({ tenantId, timestamp: { $gte: from, $lte: to } })
+      .sort({ timestamp: 1 })
+      .limit(300)
+      .select('eventType timestamp visitCountToday snapshotImage notes incident.alertType');
+
+    // Recorder heartbeat: was the AI recorder collecting data during this window?
+    const firstEver = await CameraAuditLog.findOne({ tenantId, eventType: 'FACE_VISIT' }).sort({ timestamp: 1 }).select('timestamp');
+
+    res.json({
+      success: true,
+      from,
+      to,
+      totalEvents: logs.length,
+      customers: logs.filter(l => l.eventType === 'FACE_VISIT').reduce((a, l) => a + (l.visitCountToday || 1), 0),
+      recorderFirstDataAt: firstEver?.timestamp || null,
+      events: logs.map(l => ({
+        time: l.timestamp,
+        type: l.eventType,
+        count: l.visitCountToday,
+        note: l.notes,
+        alert: (l as any).incident?.alertType,
+        image: l.snapshotImage || null
+      }))
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: 'टाइमलाइन लोड नहीं हो सकी।', error: error.message });
+  }
+};

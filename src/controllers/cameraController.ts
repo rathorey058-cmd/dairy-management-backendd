@@ -946,6 +946,7 @@ export const evaluateEdgeRules = async (req: Request, res: Response): Promise<vo
           eventType: 'FACE_VISIT',
           timestamp: new Date(),
           visitCountToday: req.body.footfallArrivals,
+          snapshotImage: req.body.footfallSnapshot,
           notes: `AI कैमरा: +${req.body.footfallArrivals} नया ग्राहक काउंटर पर देखा गया।`,
           status: 'VERIFIED'
         });
@@ -970,6 +971,7 @@ export const evaluateEdgeRules = async (req: Request, res: Response): Promise<vo
         eventType: 'FACE_VISIT',
         timestamp: new Date(),
         visitCountToday: req.body.footfallArrivals,
+          snapshotImage: req.body.footfallSnapshot,
         notes: `AI कैमरा: +${req.body.footfallArrivals} नया ग्राहक काउंटर पर देखा गया।`,
         status: 'VERIFIED'
       });
