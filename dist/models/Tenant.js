@@ -59,9 +59,12 @@ const tenantSchema = new mongoose_1.Schema({
     isOnboardingCompleted: { type: Boolean, default: false },
     geminiApiKey: { type: String },
     aiPairingConfig: {
-        planTier: { type: String, enum: ['FREE', 'PAID', 'CUSTOM'], default: 'FREE' },
+        planTier: { type: String, enum: ['FREE', 'BASIC', 'PAID', 'PRO', 'ENTERPRISE', 'CUSTOM'], default: 'FREE' },
         allowedBlocksLimit: { type: Number, default: 15 },
         freeBlocksCount: { type: Number, default: 15 },
+        allowedCamerasLimit: { type: Number, default: 5 },
+        audioTriMatchEnabled: { type: Boolean, default: true },
+        activeAddOns: { type: [String], default: [] },
         isPaidPlanActive: { type: Boolean, default: false }
     },
     status: { type: String, enum: ['Active', 'Trial', 'Suspended'], default: 'Trial' },

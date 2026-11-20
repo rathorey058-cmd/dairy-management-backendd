@@ -68,6 +68,7 @@ app.use('/api/bandhi', bandhiRoutes_1.default);
 app.use('/api/udhari', udhariRoutes_1.default);
 app.use('/api/cameras', cameraRoutes_1.default);
 app.use('/api/tenant', tenantRoutes_1.default);
+app.use('/api/tenants', tenantRoutes_1.default);
 const mongoose_1 = __importDefault(require("mongoose"));
 const db_1 = require("./config/db");
 // Health check

@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getReusableCansSummary = exports.recordGateMovement = exports.recordShelfPickEvent = exports.deleteVisualPairingBlock = exports.saveVisualPairingBlock = exports.getVisualPairingBlocks = exports.purgeExpiredData = exports.getDpdpComplianceStatus = exports.evaluateEdgeRules = exports.updateIncidentStatus = exports.getUltraCrispIncidents = exports.pushCameraFrame = exports.getLiveCameraSnapshot = exports.resolveFarmerToken = exports.deleteShelfBlock = exports.saveShelfBlock = exports.getShelfBlocks = exports.getAuditLogs = exports.getIstDateBounds = exports.detectPersonAndVisits = exports.scanShelfInventory = exports.verifyDualAudit = exports.captureAndAnalyzeOCR = exports.testCameraConnection = exports.deleteCamera = exports.saveCamera = exports.getCameras = void 0;
+const MilkSale_1 = require("../models/MilkSale");
+const Order_1 = require("../models/Order");
 const server_1 = require("../server");
 const CameraDevice_1 = require("../models/CameraDevice");
 const KiranaShelf_1 = require("../models/KiranaShelf");
@@ -764,6 +766,40 @@ const evaluateEdgeRules = async (req, res) => {
         const timeCode = new Date().toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         let triggeredIncident = null;
         let eventType = null;
+        // Rule 0: AUTO-MATCH drawer opening with POS bills (+-90s) — sent by 24/7 recorder
+        if (req.body.drawerOpened && req.body.autoMatchBill) {
+            const at = req.body.eventAt ? new Date(req.body.eventAt) : new Date();
+            const lo = new Date(at.getTime() - 90000);
+            const hi = new Date(at.getTime() + 90000);
+            const [ms, os] = await Promise.all([
+                MilkSale_1.MilkSale.find({ tenantId, createdAt: { $gte: lo, $lte: hi } }).select('totalAmount'),
+                Order_1.Order.find({ tenantId, createdAt: { $gte: lo, $lte: hi } }).select('totalAmount'),
+            ]);
+            const billTotal = [...ms, ...os].reduce((a, b) => a + (b.totalAmount || 0), 0);
+            const billed = billTotal > 0;
+            const tc = at.toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            await CameraAuditLog_1.CameraAuditLog.create({
+                tenantId,
+                eventType: billed ? 'GALLA_ALERT' : 'CASH_DRAWER_MISMATCH',
+                timestamp: at,
+                incident: {
+                    timeCode: tc,
+                    alertType: billed ? 'गल्ला खुला (बिल के साथ)' : '🚨 गल्ला बिना बिल खुला',
+                    amountOrItem: billed ? `बिल ₹${Math.round(billTotal)}` : 'बिल: ₹0',
+                    rootCause: billed ? 'गल्ला खुलने के आसपास बिल कटा।' : 'गल्ला खुलने के ±90 सेकंड में कोई बिल नहीं कटा।',
+                    confidence: 80,
+                    audioVerified: false,
+                    micChannel: 'Cash Drawer Mic',
+                    status: billed ? 'CLEARED_SAFE' : 'PENDING_REVIEW',
+                },
+                currencyDetails: { notesDetected: [], totalEstimatedCash: 0, drawerStatus: 'OPENED', activeBillAmount: billTotal },
+                snapshotImage: req.body.snapshotImage,
+                status: billed ? 'VERIFIED' : 'MISMATCH',
+                notes: billed ? `गल्ला खुला, बिल ₹${Math.round(billTotal)} मिला` : 'गल्ला बिना बिल खुला',
+            });
+            res.json({ success: true, triggered: !billed, billed, billTotal });
+            return;
+        }
         // Rule 1: Cash Drawer Mismatch (Galla opened without active POS sale)
         if (drawerOpened && activeBillAmount === 0) {
             eventType = 'CASH_DRAWER_MISMATCH';
@@ -875,6 +911,7 @@ const evaluateEdgeRules = async (req, res) => {
                     eventType: 'FACE_VISIT',
                     timestamp: new Date(),
                     visitCountToday: req.body.footfallArrivals,
+                    snapshotImage: req.body.footfallSnapshot,
                     notes: `AI कैमरा: +${req.body.footfallArrivals} नया ग्राहक काउंटर पर देखा गया।`,
                     status: 'VERIFIED'
                 });
@@ -897,6 +934,7 @@ const evaluateEdgeRules = async (req, res) => {
                 eventType: 'FACE_VISIT',
                 timestamp: new Date(),
                 visitCountToday: req.body.footfallArrivals,
+                snapshotImage: req.body.footfallSnapshot,
                 notes: `AI कैमरा: +${req.body.footfallArrivals} नया ग्राहक काउंटर पर देखा गया।`,
                 status: 'VERIFIED'
             });

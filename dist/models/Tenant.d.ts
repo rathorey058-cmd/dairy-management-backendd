@@ -7,9 +7,12 @@ export interface IMicrophoneDevice {
     enabled: boolean;
 }
 export interface ITenantAiPairingConfig {
-    planTier: 'FREE' | 'PAID' | 'CUSTOM';
+    planTier: 'FREE' | 'BASIC' | 'PAID' | 'PRO' | 'ENTERPRISE' | 'CUSTOM';
     allowedBlocksLimit: number;
     freeBlocksCount: number;
+    allowedCamerasLimit?: number;
+    audioTriMatchEnabled?: boolean;
+    activeAddOns?: string[];
     isPaidPlanActive: boolean;
 }
 export interface ITenantPricingConfig {

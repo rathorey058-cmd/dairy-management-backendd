@@ -10,6 +10,7 @@ router.put('/settings', tenantController_1.updateTenantSettings);
 router.post('/onboarding-complete', tenantController_1.completeOnboarding);
 // AI Pairing Quota & SuperAdmin Limit Controls
 router.get('/my-pairing-quota', tenantController_1.getMyPairingQuota);
+router.post('/upgrade-slab', tenantController_1.upgradeMyPlanSlab);
 router.get('/admin/pairing-limits', tenantController_1.getAllTenantsPairingLimits);
 router.put('/admin/pairing-limits/:id', tenantController_1.updateTenantPairingLimitByAdmin);
 exports.default = router;

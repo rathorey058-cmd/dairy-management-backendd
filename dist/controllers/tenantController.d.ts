@@ -23,3 +23,7 @@ export declare const getAllTenantsPairingLimits: (req: Request, res: Response) =
  * SUPER ADMIN: Update a tenant's AI pairing block limits & plan tier
  */
 export declare const updateTenantPairingLimitByAdmin: (req: Request, res: Response) => Promise<void>;
+/**
+ * Upgrade current tenant's Plan Slab or activate an Extra Add-On Pack
+ */
+export declare const upgradeMyPlanSlab: (req: Request, res: Response) => Promise<void>;

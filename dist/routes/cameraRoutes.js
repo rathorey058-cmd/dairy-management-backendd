@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const authMiddleware_1 = require("../middleware/authMiddleware");
+const dailySummaryController_1 = require("../controllers/dailySummaryController");
+const triMatchController_1 = require("../controllers/triMatchController");
 const cameraController_1 = require("../controllers/cameraController");
 const shopAiController_1 = require("../controllers/shopAiController");
 const shopSurveillanceController_1 = require("../controllers/shopSurveillanceController");
@@ -15,11 +17,16 @@ router.post('/profiles', shopSurveillanceController_1.savePersonProfile);
 router.delete('/profiles/:id', shopSurveillanceController_1.deletePersonProfile);
 // 2. Time-Interval Sales, Footfall & Galla Report
 router.get('/reports/time-interval', shopSurveillanceController_1.getTimeIntervalGallaReport);
+router.get('/reports/daily-summary', dailySummaryController_1.getDailySummary);
+router.get('/reports/tri-match', triMatchController_1.getTriMatchReport);
+router.get('/audit-log/:id/image', triMatchController_1.getAuditImage);
+router.post('/recorder-heartbeat', dailySummaryController_1.recorderHeartbeat);
 // 3. Fridge / Refrigerator Inventory & Night Alerts
 router.get('/fridge/status', shopSurveillanceController_1.getFridgeStatus);
 router.post('/fridge/audit', shopSurveillanceController_1.auditFridgeAccess);
 // 4. In-App DVR Playback (From HDD)
 router.get('/playback/search', shopSurveillanceController_1.searchDvrPlayback);
+router.get('/playback/timeline', shopSurveillanceController_1.getPlaybackTimeline);
 // Shop Intelligence, CCTV/Video Upload, Voice Recognition & Live Audits
 router.post('/shop-ai/upload-analyze', shopAiController_1.analyzeMediaUpload);
 router.post('/shop-ai/live-audit', shopAiController_1.auditLiveStreamSnapshot);

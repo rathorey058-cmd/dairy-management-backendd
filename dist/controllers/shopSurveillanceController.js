@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchDvrPlayback = exports.auditFridgeAccess = exports.getFridgeStatus = exports.getTimeIntervalGallaReport = exports.deletePersonProfile = exports.savePersonProfile = exports.getPersonProfiles = void 0;
+exports.getPlaybackTimeline = exports.searchDvrPlayback = exports.auditFridgeAccess = exports.getFridgeStatus = exports.getTimeIntervalGallaReport = exports.deletePersonProfile = exports.savePersonProfile = exports.getPersonProfiles = void 0;
 const ShopPersonProfile_1 = require("../models/ShopPersonProfile");
 const KiranaShelf_1 = require("../models/KiranaShelf");
 const CameraAuditLog_1 = require("../models/CameraAuditLog");
@@ -196,13 +196,7 @@ const getTimeIntervalGallaReport = async (req, res) => {
             notes: l.notes || 'संदेहास्पद हलचल दर्ज',
             status: l.status || 'PENDING_REVIEW'
         }));
-        // If no direct snapshot report, derive realistic footfall from transaction & camera interaction density
-        if (totalFootfall === 0 && (milkSales.length > 0 || orders.length > 0 || gallaAuditLogs.length > 0)) {
-            totalFootfall = Math.max(milkSales.length + orders.length + gallaAuditLogs.length, 1);
-            menCount = Math.round(totalFootfall * 0.6);
-            womenCount = Math.round(totalFootfall * 0.3);
-            childrenCount = Math.max(0, totalFootfall - menCount - womenCount);
-        }
+        // Do not fabricate footfall if camera did not capture any FACE_VISIT
         // Aggregate Currency Notes detected by AI Camera
         const notesTally = { '500': 0, '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 };
         let aiEstimatedVisualCash = 0;
@@ -375,3 +369,41 @@ const searchDvrPlayback = async (req, res) => {
     }
 };
 exports.searchDvrPlayback = searchDvrPlayback;
+// ============================================================================
+// 5. PLAYBACK TIMELINE (REAL RECORDED AI EVENTS FOR A TIME WINDOW)
+// ============================================================================
+const getPlaybackTimeline = async (req, res) => {
+    try {
+        const tenantId = req.tenantId || req.user?.tenantId;
+        const { date, startTime = '00:00', endTime = '23:59' } = req.query;
+        const day = typeof date === 'string' && date ? date : new Date().toISOString().split('T')[0];
+        const from = new Date(`${day}T${startTime}:00+05:30`);
+        const to = new Date(`${day}T${endTime}:59.999+05:30`);
+        const logs = await CameraAuditLog_1.CameraAuditLog.find({ tenantId, timestamp: { $gte: from, $lte: to } })
+            .sort({ timestamp: 1 })
+            .limit(300)
+            .select('eventType timestamp visitCountToday snapshotImage notes incident.alertType');
+        // Recorder heartbeat: was the AI recorder collecting data during this window?
+        const firstEver = await CameraAuditLog_1.CameraAuditLog.findOne({ tenantId, eventType: 'FACE_VISIT' }).sort({ timestamp: 1 }).select('timestamp');
+        res.json({
+            success: true,
+            from,
+            to,
+            totalEvents: logs.length,
+            customers: logs.filter(l => l.eventType === 'FACE_VISIT').reduce((a, l) => a + (l.visitCountToday || 1), 0),
+            recorderFirstDataAt: firstEver?.timestamp || null,
+            events: logs.map(l => ({
+                time: l.timestamp,
+                type: l.eventType,
+                count: l.visitCountToday,
+                note: l.notes,
+                alert: l.incident?.alertType,
+                image: l.snapshotImage || null
+            }))
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: 'टाइमलाइन लोड नहीं हो सकी।', error: error.message });
+    }
+};
+exports.getPlaybackTimeline = getPlaybackTimeline;

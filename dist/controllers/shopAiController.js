@@ -322,10 +322,11 @@ const generateDailyAiReport = async (req, res) => {
         const totalMilkCash = milkSales.filter(s => s.paymentMode === 'Cash').reduce((acc, s) => acc + (s.totalAmount || 0), 0);
         const totalOrderCash = orders.filter(o => o.paymentMode === 'Cash').reduce((acc, o) => acc + (o.totalAmount || 0), 0);
         const totalRevenue = milkSales.reduce((acc, s) => acc + (s.totalAmount || 0), 0) + orders.reduce((acc, o) => acc + (o.totalAmount || 0), 0);
-        const footfallEstimated = Math.max(orders.length + milkSales.length + auditLogs.length, 14);
+        const faceVisits = auditLogs.filter(l => l.eventType === 'FACE_VISIT');
+        const footfallEstimated = faceVisits.reduce((acc, l) => acc + (l.visitCountToday || 1), 0);
         const menCount = Math.round(footfallEstimated * 0.55);
         const womenCount = Math.round(footfallEstimated * 0.35);
-        const childrenCount = footfallEstimated - menCount - womenCount;
+        const childrenCount = Math.max(0, footfallEstimated - menCount - womenCount);
         const concerns = theftIncidents.map(i => `[${i.incident?.timeCode || new Date(i.timestamp).toLocaleTimeString('hi-IN')}] ${i.incident?.alertType || i.eventType}: ${i.incident?.rootCause || i.notes || 'संदेहास्पद हलचल'}`);
         const fullReportText = `
 ### 📊 दैनिक AI दुकान निरीक्षण एवं सुरक्षा रिपोर्ट (${targetDateStr})

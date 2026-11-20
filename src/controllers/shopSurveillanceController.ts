@@ -223,13 +223,7 @@ export const getTimeIntervalGallaReport = async (req: Request, res: Response): P
       status: l.status || 'PENDING_REVIEW'
     }));
 
-    // If no direct snapshot report, derive realistic footfall from transaction & camera interaction density
-    if (totalFootfall === 0 && (milkSales.length > 0 || orders.length > 0 || gallaAuditLogs.length > 0)) {
-      totalFootfall = Math.max(milkSales.length + orders.length + gallaAuditLogs.length, 1);
-      menCount = Math.round(totalFootfall * 0.6);
-      womenCount = Math.round(totalFootfall * 0.3);
-      childrenCount = Math.max(0, totalFootfall - menCount - womenCount);
-    }
+    // Do not fabricate footfall if camera did not capture any FACE_VISIT
 
     // Aggregate Currency Notes detected by AI Camera
     const notesTally: Record<string, number> = { '500': 0, '200': 0, '100': 0, '50': 0, '20': 0, '10': 0 };
