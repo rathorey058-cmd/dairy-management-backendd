@@ -6,7 +6,8 @@ import {
   completeOnboarding,
   getMyPairingQuota,
   getAllTenantsPairingLimits,
-  updateTenantPairingLimitByAdmin
+  updateTenantPairingLimitByAdmin,
+  upgradeMyPlanSlab
 } from '../controllers/tenantController';
 
 const router = Router();
@@ -19,6 +20,7 @@ router.post('/onboarding-complete', completeOnboarding);
 
 // AI Pairing Quota & SuperAdmin Limit Controls
 router.get('/my-pairing-quota', getMyPairingQuota);
+router.post('/upgrade-slab', upgradeMyPlanSlab);
 router.get('/admin/pairing-limits', getAllTenantsPairingLimits);
 router.put('/admin/pairing-limits/:id', updateTenantPairingLimitByAdmin);
 

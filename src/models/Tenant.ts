@@ -9,9 +9,12 @@ export interface IMicrophoneDevice {
 }
 
 export interface ITenantAiPairingConfig {
-  planTier: 'FREE' | 'PAID' | 'CUSTOM';
-  allowedBlocksLimit: number; // e.g. 15 for Free, 60+ for Paid
+  planTier: 'FREE' | 'BASIC' | 'PAID' | 'PRO' | 'ENTERPRISE' | 'CUSTOM';
+  allowedBlocksLimit: number; // e.g. 15 for Free, 35 Basic, 75 Pro, 200 Enterprise
   freeBlocksCount: number;    // Default 15
+  allowedCamerasLimit?: number; // Default 5
+  audioTriMatchEnabled?: boolean;
+  activeAddOns?: string[];
   isPaidPlanActive: boolean;
 }
 
@@ -124,9 +127,12 @@ const tenantSchema = new Schema<ITenant>({
   isOnboardingCompleted: { type: Boolean, default: false },
   geminiApiKey: { type: String },
   aiPairingConfig: {
-    planTier: { type: String, enum: ['FREE', 'PAID', 'CUSTOM'], default: 'FREE' },
+    planTier: { type: String, enum: ['FREE', 'BASIC', 'PAID', 'PRO', 'ENTERPRISE', 'CUSTOM'], default: 'FREE' },
     allowedBlocksLimit: { type: Number, default: 15 },
     freeBlocksCount: { type: Number, default: 15 },
+    allowedCamerasLimit: { type: Number, default: 5 },
+    audioTriMatchEnabled: { type: Boolean, default: true },
+    activeAddOns: { type: [String], default: [] },
     isPaidPlanActive: { type: Boolean, default: false }
   },
   status: { type: String, enum: ['Active', 'Trial', 'Suspended'], default: 'Trial' },

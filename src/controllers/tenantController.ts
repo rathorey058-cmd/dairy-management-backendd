@@ -242,9 +242,13 @@ export const getMyPairingQuota = async (req: Request, res: Response): Promise<vo
     res.json({
       success: true,
       quota: {
+        tenantId: tenant._id,
         planTier: config.planTier,
         allowedBlocksLimit: allowedLimit,
         freeBlocksCount: config.freeBlocksCount || 15,
+        allowedCamerasLimit: config.allowedCamerasLimit || (allowedLimit >= 150 ? 16 : allowedLimit >= 60 ? 8 : allowedLimit >= 30 ? 4 : 2),
+        audioTriMatchEnabled: config.audioTriMatchEnabled !== false,
+        activeAddOns: config.activeAddOns || [],
         isPaidPlanActive: Boolean(config.isPaidPlanActive),
         usedBlocksCount,
         remainingBlocks,
@@ -308,7 +312,7 @@ export const getAllTenantsPairingLimits = async (req: Request, res: Response): P
 export const updateTenantPairingLimitByAdmin = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { planTier, allowedBlocksLimit, freeBlocksCount, isPaidPlanActive } = req.body;
+    const { planTier, allowedBlocksLimit, freeBlocksCount, allowedCamerasLimit, audioTriMatchEnabled, activeAddOns, isPaidPlanActive } = req.body;
 
     const tenant = await Tenant.findById(id);
     if (!tenant) {
@@ -320,18 +324,27 @@ export const updateTenantPairingLimitByAdmin = async (req: Request, res: Respons
       planTier: 'FREE',
       allowedBlocksLimit: 15,
       freeBlocksCount: 15,
+      allowedCamerasLimit: 5,
+      audioTriMatchEnabled: true,
+      activeAddOns: [],
       isPaidPlanActive: false
     };
 
     const newPlanTier = planTier || currentConfig.planTier || 'FREE';
     const newLimit = allowedBlocksLimit !== undefined ? Number(allowedBlocksLimit) : (currentConfig.allowedBlocksLimit || 15);
     const newFreeCount = freeBlocksCount !== undefined ? Number(freeBlocksCount) : (currentConfig.freeBlocksCount || 15);
+    const newCamLimit = allowedCamerasLimit !== undefined ? Number(allowedCamerasLimit) : (currentConfig.allowedCamerasLimit || 5);
+    const newAudio = audioTriMatchEnabled !== undefined ? Boolean(audioTriMatchEnabled) : (currentConfig.audioTriMatchEnabled !== false);
+    const newAddOns = Array.isArray(activeAddOns) ? activeAddOns : (currentConfig.activeAddOns || []);
     const newIsPaid = isPaidPlanActive !== undefined ? Boolean(isPaidPlanActive) : Boolean(currentConfig.isPaidPlanActive);
 
     tenant.aiPairingConfig = {
       planTier: newPlanTier as any,
       allowedBlocksLimit: newLimit,
       freeBlocksCount: newFreeCount,
+      allowedCamerasLimit: newCamLimit,
+      audioTriMatchEnabled: newAudio,
+      activeAddOns: newAddOns,
       isPaidPlanActive: newIsPaid
     };
 
@@ -345,6 +358,96 @@ export const updateTenantPairingLimitByAdmin = async (req: Request, res: Respons
   } catch (err: any) {
     console.error('updateTenantPairingLimitByAdmin error:', err);
     res.status(500).json({ message: 'Error updating tenant limit', error: err.message });
+  }
+};
+
+/**
+ * Upgrade current tenant's Plan Slab or activate an Extra Add-On Pack
+ */
+export const upgradeMyPlanSlab = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const tenantId = (req as any).tenantId;
+    if (!tenantId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const { slabId, addOnId } = req.body;
+    const tenant = await Tenant.findById(tenantId);
+    if (!tenant) {
+      res.status(404).json({ message: 'Tenant not found' });
+      return;
+    }
+
+    const cur = tenant.aiPairingConfig || {
+      planTier: 'FREE',
+      allowedBlocksLimit: 15,
+      freeBlocksCount: 15,
+      allowedCamerasLimit: 2,
+      audioTriMatchEnabled: true,
+      activeAddOns: [],
+      isPaidPlanActive: false
+    };
+
+    let planTier = cur.planTier || 'FREE';
+    let allowedBlocksLimit = cur.allowedBlocksLimit || 15;
+    let allowedCamerasLimit = cur.allowedCamerasLimit || 4;
+    let audioTriMatchEnabled = cur.audioTriMatchEnabled !== false;
+    const activeAddOns = new Set<string>(cur.activeAddOns || []);
+
+    if (slabId === 'FREE') {
+      planTier = 'FREE';
+      allowedBlocksLimit = 15;
+      allowedCamerasLimit = 2;
+    } else if (slabId === 'BASIC') {
+      planTier = 'BASIC';
+      allowedBlocksLimit = Math.max(35, allowedBlocksLimit);
+      allowedCamerasLimit = Math.max(4, allowedCamerasLimit);
+    } else if (slabId === 'PRO' || slabId === 'PAID') {
+      planTier = 'PRO';
+      allowedBlocksLimit = Math.max(75, allowedBlocksLimit);
+      allowedCamerasLimit = Math.max(8, allowedCamerasLimit);
+      audioTriMatchEnabled = true;
+    } else if (slabId === 'ENTERPRISE') {
+      planTier = 'ENTERPRISE';
+      allowedBlocksLimit = Math.max(200, allowedBlocksLimit);
+      allowedCamerasLimit = Math.max(16, allowedCamerasLimit);
+      audioTriMatchEnabled = true;
+    }
+
+    if (addOnId === 'ADDON_15_BLOCKS') {
+      allowedBlocksLimit += 15;
+      activeAddOns.add('ADDON_15_BLOCKS');
+    } else if (addOnId === 'ADDON_50_BLOCKS') {
+      allowedBlocksLimit += 50;
+      activeAddOns.add('ADDON_50_BLOCKS');
+    } else if (addOnId === 'ADDON_4_CAMERAS') {
+      allowedCamerasLimit += 4;
+      activeAddOns.add('ADDON_4_CAMERAS');
+    } else if (addOnId === 'ADDON_AUDIO_AI') {
+      audioTriMatchEnabled = true;
+      activeAddOns.add('ADDON_AUDIO_AI');
+    }
+
+    tenant.aiPairingConfig = {
+      planTier: planTier as any,
+      allowedBlocksLimit,
+      freeBlocksCount: cur.freeBlocksCount || 15,
+      allowedCamerasLimit,
+      audioTriMatchEnabled,
+      activeAddOns: Array.from(activeAddOns),
+      isPaidPlanActive: planTier !== 'FREE' || allowedBlocksLimit > 15
+    };
+
+    await tenant.save();
+
+    res.json({
+      success: true,
+      message: 'प्लान स्लैब व कोटा सफलतापूर्वक अपडेट हो गया!',
+      aiPairingConfig: tenant.aiPairingConfig
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: 'Error upgrading plan slab', error: err.message });
   }
 };
 
