@@ -72,6 +72,7 @@ app.use('/api/bandhi', bandhiRoutes);
 app.use('/api/udhari', udhariRoutes);
 app.use('/api/cameras', cameraRoutes);
 app.use('/api/tenant', tenantRoutes);
+app.use('/api/tenants', tenantRoutes);
 
 import mongoose from 'mongoose';
 import { connectDB } from './config/db';
