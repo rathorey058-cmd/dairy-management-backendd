@@ -85,6 +85,17 @@ export interface ICameraAuditLog {
   snapshotImage?: string; // base64 or relative url
   videoClipUrl?: string;  // 10s video buffer replay
   audioClipUrl?: string;
+  videoZone?: string;
+  aiAnalysis?: {
+    audioQuote?: string;
+    requestedItem?: string;
+    givenItem?: string;
+    amountPaid?: number;
+    cashHandedOver?: boolean;
+    analystSummary?: string;
+    model?: string;
+    analyzedAt?: Date;
+  };
   status: 'VERIFIED' | 'MISMATCH' | 'RESOLVED' | 'INFO';
   operatorUser?: Types.ObjectId; // Ref User who was at counter
   notes?: string;
@@ -165,6 +176,17 @@ const cameraAuditLogSchema = new Schema<ICameraAuditLog>({
   snapshotImage: { type: String },
   videoClipUrl: { type: String },
   audioClipUrl: { type: String },
+  videoZone: { type: String },
+  aiAnalysis: {
+    audioQuote: { type: String },
+    requestedItem: { type: String },
+    givenItem: { type: String },
+    amountPaid: { type: Number },
+    cashHandedOver: { type: Boolean },
+    analystSummary: { type: String },
+    model: { type: String },
+    analyzedAt: { type: Date }
+  },
   status: { 
     type: String, 
     enum: ['VERIFIED', 'MISMATCH', 'RESOLVED', 'INFO'], 

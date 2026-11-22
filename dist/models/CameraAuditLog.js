@@ -69,6 +69,17 @@ const cameraAuditLogSchema = new mongoose_1.Schema({
     snapshotImage: { type: String },
     videoClipUrl: { type: String },
     audioClipUrl: { type: String },
+    videoZone: { type: String },
+    aiAnalysis: {
+        audioQuote: { type: String },
+        requestedItem: { type: String },
+        givenItem: { type: String },
+        amountPaid: { type: Number },
+        cashHandedOver: { type: Boolean },
+        analystSummary: { type: String },
+        model: { type: String },
+        analyzedAt: { type: Date }
+    },
     status: {
         type: String,
         enum: ['VERIFIED', 'MISMATCH', 'RESOLVED', 'INFO'],

@@ -24,14 +24,21 @@ export const getTriMatchReport = async (req: Request, res: Response): Promise<vo
     const to = new Date(`${day}T${endTime}:59.999+05:30`);
 
     const [visitsRaw, audios, milk, orders, galla] = await Promise.all([
-      CameraAuditLog.find({ tenantId, eventType: 'FACE_VISIT', timestamp: { $gte: from, $lte: to } })
-        .sort({ timestamp: 1 }).select('timestamp visitCountToday'),
-      AudioTranscript.find({ tenantId, timestamp: { $gte: from, $lte: to } }).sort({ timestamp: 1 }),
-      MilkSale.find({ tenantId, createdAt: { $gte: from, $lte: to } }).sort({ createdAt: 1 }),
-      Order.find({ tenantId, createdAt: { $gte: from, $lte: to } }).sort({ createdAt: 1 }),
+      CameraAuditLog.find({
+        tenantId,
+        eventType: 'FACE_VISIT',
+        timestamp: { $gte: from, $lte: to },
+        snapshotImage: { $not: /^(SCAN|AUDIO)_REQ:/ },
+      })
+        .sort({ timestamp: 1 })
+        .select('timestamp visitCountToday videoZone aiAnalysis notes')
+        .lean(),
+      AudioTranscript.find({ tenantId, timestamp: { $gte: from, $lte: to } }).sort({ timestamp: 1 }).lean(),
+      MilkSale.find({ tenantId, createdAt: { $gte: from, $lte: to } }).sort({ createdAt: 1 }).lean(),
+      Order.find({ tenantId, createdAt: { $gte: from, $lte: to } }).sort({ createdAt: 1 }).lean(),
       CameraAuditLog.find({
         tenantId, eventType: { $in: ['GALLA_ALERT', 'CASH_DRAWER_MISMATCH'] }, timestamp: { $gte: from, $lte: to },
-      }).sort({ timestamp: 1 }).select('timestamp eventType'),
+      }).sort({ timestamp: 1 }).select('timestamp eventType').lean(),
     ]);
 
     // product names for order labels
@@ -56,6 +63,8 @@ export const getTriMatchReport = async (req: Request, res: Response): Promise<vo
       id: v._id.toString(),
       at: v.timestamp as Date,
       people: v.visitCountToday || 1,
+      aiAnalysis: v.aiAnalysis || null,
+      videoZone: v.videoZone || null,
       audio: [] as any[],
       bills: [] as any[],
       galla: [] as any[],
@@ -97,11 +106,17 @@ export const getTriMatchReport = async (req: Request, res: Response): Promise<vo
 
     const out = visits.map(v => {
       const posTotal = v.bills.reduce((s: number, b: any) => s + b.amount, 0);
+      const aiAmt = Number(v.aiAnalysis?.amountPaid || 0);
+      const aiQuote = String(v.aiAnalysis?.audioQuote || '').trim();
+      const aiReq = String(v.aiAnalysis?.requestedItem || '').trim();
+      const aiGiven = String(v.aiAnalysis?.givenItem || '').trim();
+      const aiSummary = String(v.aiAnalysis?.analystSummary || '').trim();
       const heard: number[] = v.audio.flatMap((a: any) => a.amounts);
+      if (!heard.length && aiAmt > 0) heard.push(aiAmt);
       const heardAmt = heard.length ? heard[heard.length - 1] : 0;
       const hasBill = v.bills.length > 0;
-      const hasAudio = heard.length > 0 || v.audio.some((a: any) => a.items.length > 0);
-      const gallaOpen = v.galla.length > 0;
+      const hasAudio = heard.length > 0 || v.audio.some((a: any) => a.items.length > 0) || Boolean(aiQuote) || Boolean(aiReq && aiReq !== 'स्पष्ट नहीं');
+      const gallaOpen = v.galla.length > 0 || Boolean(v.aiAnalysis?.cashHandedOver);
 
       let verdict: Verdict; let note: string;
       if (hasBill && heard.length && (heard.some(h => near(h, posTotal)))) {
@@ -111,16 +126,19 @@ export const getTriMatchReport = async (req: Request, res: Response): Promise<vo
       } else if (hasBill) {
         verdict = 'POS_ONLY'; note = `बिल ₹${posTotal} कटा (ऑडियो में रकम साफ़ नहीं सुनी)।`;
       } else if (heard.length || hasAudio) {
-        verdict = 'AUDIO_NO_BILL'; note = heard.length ? `ग्राहक ने ₹${heardAmt} की बात की, पर कोई बिल नहीं कटा।` : 'सामान की बात सुनी गई, पर कोई बिल नहीं कटा।';
+        verdict = 'AUDIO_NO_BILL'; note = aiSummary || (heard.length ? `ग्राहक ने ₹${heardAmt} की बात की, पर कोई बिल नहीं कटा।` : 'सामान की बात सुनी गई, पर कोई बिल नहीं कटा।');
       } else if (gallaOpen) {
-        verdict = 'GALLA_NO_BILL'; note = 'गल्ला खुला, पर न बिल कटा न कोई बात रिकॉर्ड हुई।';
+        verdict = 'GALLA_NO_BILL'; note = aiSummary || 'गल्ला खुला, पर न बिल कटा न कोई बात रिकॉर्ड हुई।';
       } else {
-        verdict = 'NO_PURCHASE'; note = 'ग्राहक आया, कोई खरीद दिखी नहीं।';
+        verdict = 'NO_PURCHASE'; note = aiSummary || 'ग्राहक आया, कोई खरीद दिखी नहीं।';
       }
+      const audioOut = v.audio.length
+        ? v.audio
+        : (aiQuote ? [{ at: v.at, text: aiQuote, amounts: aiAmt ? [aiAmt] : [], items: aiReq ? [{ name: aiReq }] : [] }] : []);
       return {
         id: v.id, time: v.at, people: v.people,
-        video: { arrived: true, people: v.people },
-        audio: v.audio, pos: { bills: v.bills, total: posTotal }, galla: v.galla,
+        video: { arrived: true, people: v.people, givenItem: aiGiven || v.videoZone || undefined },
+        audio: audioOut, pos: { bills: v.bills, total: posTotal }, galla: v.galla,
         heardAmount: heardAmt || null,
         verdict, note,
       };

@@ -58,6 +58,17 @@ export interface ICameraAuditLog {
     snapshotImage?: string;
     videoClipUrl?: string;
     audioClipUrl?: string;
+    videoZone?: string;
+    aiAnalysis?: {
+        audioQuote?: string;
+        requestedItem?: string;
+        givenItem?: string;
+        amountPaid?: number;
+        cashHandedOver?: boolean;
+        analystSummary?: string;
+        model?: string;
+        analyzedAt?: Date;
+    };
     status: 'VERIFIED' | 'MISMATCH' | 'RESOLVED' | 'INFO';
     operatorUser?: Types.ObjectId;
     notes?: string;

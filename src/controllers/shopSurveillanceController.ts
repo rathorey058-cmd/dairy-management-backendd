@@ -418,34 +418,74 @@ export const searchDvrPlayback = async (req: Request, res: Response): Promise<vo
 export const getPlaybackTimeline = async (req: Request, res: Response): Promise<void> => {
   try {
     const tenantId = (req as any).tenantId || (req as any).user?.tenantId;
-    const { date, startTime = '00:00', endTime = '23:59' } = req.query as any;
+    const { date, startTime = '00:00', endTime = '23:59', includeImages } = req.query as any;
     const day = typeof date === 'string' && date ? date : new Date().toISOString().split('T')[0];
     const from = new Date(`${day}T${startTime}:00+05:30`);
     const to = new Date(`${day}T${endTime}:59.999+05:30`);
+    const wantInline = includeImages === '1' || includeImages === 'true';
 
-    const logs = await CameraAuditLog.find({ tenantId, timestamp: { $gte: from, $lte: to } })
-      .sort({ timestamp: 1 })
-      .limit(300)
-      .select('eventType timestamp visitCountToday snapshotImage notes incident.alertType');
+    const priorityTypes = ['FACE_VISIT', 'GALLA_ALERT', 'CASH_DRAWER_MISMATCH', 'MULTI_MIC_ALERT', 'HAND_TO_POCKET', 'HAND_TO_MOUTH'];
+    const baseFilter: any = {
+      tenantId,
+      timestamp: { $gte: from, $lte: to },
+      snapshotImage: { $not: /^(SCAN|AUDIO)_REQ:/ },
+    };
 
-    // Recorder heartbeat: was the AI recorder collecting data during this window?
-    const firstEver = await CameraAuditLog.findOne({ tenantId, eventType: 'FACE_VISIT' }).sort({ timestamp: 1 }).select('timestamp');
+    const projectStage: any = {
+      eventType: 1,
+      timestamp: 1,
+      visitCountToday: 1,
+      notes: 1,
+      'incident.alertType': 1,
+      hasImage: {
+        $and: [
+          { $eq: [{ $type: '$snapshotImage' }, 'string'] },
+          { $gt: [{ $strLenCP: { $ifNull: ['$snapshotImage', ''] } }, 100] },
+        ],
+      },
+    };
+    if (wantInline) {
+      projectStage.snapshotImage = 1;
+    }
+
+    // Fetch customer visits + galla alerts separately from noisy slab scans so visits are NEVER cut off
+    const [priorityLogs, slabLogs, firstEver] = await Promise.all([
+      CameraAuditLog.aggregate([
+        { $match: { ...baseFilter, eventType: { $in: priorityTypes } } },
+        { $sort: { timestamp: 1 } },
+        { $limit: 500 },
+        { $project: projectStage },
+      ]),
+      CameraAuditLog.aggregate([
+        { $match: { ...baseFilter, eventType: { $nin: priorityTypes } } },
+        { $sort: { timestamp: -1 } },
+        { $limit: 120 },
+        { $project: projectStage },
+      ]),
+      CameraAuditLog.findOne({ tenantId, eventType: 'FACE_VISIT' }).sort({ timestamp: 1 }).select('timestamp'),
+    ]);
+
+    const combined = [...priorityLogs, ...slabLogs].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
 
     res.json({
       success: true,
       from,
       to,
-      totalEvents: logs.length,
-      customers: logs.filter(l => l.eventType === 'FACE_VISIT').reduce((a, l) => a + (l.visitCountToday || 1), 0),
+      totalEvents: combined.length,
+      customers: priorityLogs.filter((l: any) => l.eventType === 'FACE_VISIT').reduce((a: number, l: any) => a + (l.visitCountToday || 1), 0),
       recorderFirstDataAt: firstEver?.timestamp || null,
-      events: logs.map(l => ({
+      events: combined.map((l: any) => ({
+        id: String(l._id),
         time: l.timestamp,
         type: l.eventType,
         count: l.visitCountToday,
         note: l.notes,
-        alert: (l as any).incident?.alertType,
-        image: l.snapshotImage || null
-      }))
+        alert: l.incident?.alertType,
+        hasImage: Boolean(l.hasImage),
+        image: wantInline ? (l.snapshotImage || null) : null,
+      })),
     });
   } catch (error: any) {
     res.status(500).json({ success: false, message: 'टाइमलाइन लोड नहीं हो सकी।', error: error.message });
