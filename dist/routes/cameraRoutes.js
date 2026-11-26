@@ -4,13 +4,26 @@ const express_1 = require("express");
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const dailySummaryController_1 = require("../controllers/dailySummaryController");
 const triMatchController_1 = require("../controllers/triMatchController");
+const liveTelemetryController_1 = require("../controllers/liveTelemetryController");
+const aiTrainerController_1 = require("../controllers/aiTrainerController");
 const cameraController_1 = require("../controllers/cameraController");
 const shopAiController_1 = require("../controllers/shopAiController");
 const shopSurveillanceController_1 = require("../controllers/shopSurveillanceController");
 const router = (0, express_1.Router)();
-// Public Frame Ingestion from Local Shop DVR Bridge
+// Public Frame & Live Telemetry Ingestion from Local Shop DVR Bridge / Python Edge AI
 router.post('/:id/push-frame', cameraController_1.pushCameraFrame);
+router.post('/live-telemetry', liveTelemetryController_1.pushLiveTelemetry);
+router.post('/ai-brain/observe-person', aiTrainerController_1.observeAndLearnPerson);
 router.use(authMiddleware_1.authenticate);
+// Live Real-Time Telemetry & Pipeline Health Diagnostics
+router.get('/live-telemetry', liveTelemetryController_1.getLiveTelemetry);
+// Permanent Self-Learning AI Brain, Video Trainer & Backup Routes
+router.get('/ai-brain', aiTrainerController_1.getAiBrainState);
+router.post('/ai-brain/teach-object', aiTrainerController_1.teachAiObject);
+router.patch('/ai-brain/entity/:id', aiTrainerController_1.updateAiBrainEntity);
+router.delete('/ai-brain/entity/:id', aiTrainerController_1.deleteAiBrainEntity);
+router.get('/ai-brain/export-backup', aiTrainerController_1.exportAiBrainBackup);
+router.post('/ai-brain/import-backup', aiTrainerController_1.importAiBrainBackup);
 // 1. Owner & Staff Face Enrollment & Instructions
 router.get('/profiles', shopSurveillanceController_1.getPersonProfiles);
 router.post('/profiles', shopSurveillanceController_1.savePersonProfile);

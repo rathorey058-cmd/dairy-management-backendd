@@ -120,11 +120,11 @@ const getAuthToken = () => {
         }
     });
 };
-const pushFrameHttp = async (cameraId, base64Data, contentType) => {
+const pushFrameHttp = async (cameraId, base64Data, contentType, channel, tenantId) => {
     const token = await getAuthToken();
     return new Promise((resolve) => {
         try {
-            const postData = JSON.stringify({ base64Data, contentType });
+            const postData = JSON.stringify({ base64Data, contentType, channel, tenantId });
             const u = new URL(`${CLOUD_URL}/api/cameras/${cameraId}/push-frame`);
             const headers = {
                 'Content-Type': 'application/json',
@@ -183,7 +183,7 @@ const runBridge = async () => {
                 try {
                     const { buffer, contentType } = await (0, cameraService_1.fetchHikvisionSnapshotBuffer)(cam);
                     const base64Data = buffer.toString('base64');
-                    await pushFrameHttp(cam._id.toString(), base64Data, contentType);
+                    await pushFrameHttp(cam._id.toString(), base64Data, contentType, cam.channel || 1, cam.tenantId ? String(cam.tenantId) : undefined);
                     pushedCount++;
                     console.log(`📸 Pushed live frame: ${cam.name} [Ch #${cam.channel}] (${buffer.length} bytes)`);
                     await new Promise((r) => setTimeout(r, 100));

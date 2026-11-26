@@ -656,15 +656,25 @@ exports.getLiveCameraSnapshot = getLiveCameraSnapshot;
 const pushCameraFrame = async (req, res) => {
     try {
         const id = req.params.id;
-        const { base64Data, contentType } = req.body;
+        const { base64Data, contentType, channel, tenantId } = req.body;
         if (id && base64Data) {
             const rawBase64 = base64Data.includes('base64,') ? base64Data.split('base64,')[1] : base64Data;
             const buf = Buffer.from(rawBase64, 'base64');
+            const ts = Date.now();
             server_1.liveDvrFrameCache.set(id, {
                 buffer: buf,
                 contentType: contentType || 'image/jpeg',
-                timestamp: Date.now()
+                timestamp: ts
             });
+            if (server_1.io) {
+                const payload = { cameraId: id, channel, timestamp: ts };
+                if (tenantId) {
+                    server_1.io.to(`tenant:${tenantId}:cameras`).emit('camera:frame_ready', payload);
+                }
+                else {
+                    server_1.io.emit('camera:frame_ready', payload);
+                }
+            }
             res.json({ success: true, cachedSize: buf.length });
             return;
         }

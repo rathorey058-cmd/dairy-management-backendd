@@ -1,7 +1,7 @@
 import { MilkSale } from '../models/MilkSale';
 import { Order } from '../models/Order';
 import { Request, Response } from 'express';
-import { liveDvrFrameCache } from '../server';
+import { io, liveDvrFrameCache } from '../server';
 import { CameraDevice, ICameraDevice } from '../models/CameraDevice';
 import { KiranaShelf } from '../models/KiranaShelf';
 import { CameraAuditLog } from '../models/CameraAuditLog';
@@ -706,15 +706,24 @@ export const getLiveCameraSnapshot = async (req: Request, res: Response): Promis
 export const pushCameraFrame = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const { base64Data, contentType } = req.body;
+    const { base64Data, contentType, channel, tenantId } = req.body;
     if (id && base64Data) {
       const rawBase64 = base64Data.includes('base64,') ? base64Data.split('base64,')[1] : base64Data;
       const buf = Buffer.from(rawBase64, 'base64');
+      const ts = Date.now();
       liveDvrFrameCache.set(id, {
         buffer: buf,
         contentType: contentType || 'image/jpeg',
-        timestamp: Date.now()
+        timestamp: ts
       });
+      if (io) {
+        const payload = { cameraId: id, channel, timestamp: ts };
+        if (tenantId) {
+          io.to(`tenant:${tenantId}:cameras`).emit('camera:frame_ready', payload);
+        } else {
+          io.emit('camera:frame_ready', payload);
+        }
+      }
       res.json({ success: true, cachedSize: buf.length });
       return;
     }

@@ -2,6 +2,16 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/authMiddleware';
 import { recorderHeartbeat, getDailySummary } from '../controllers/dailySummaryController';
 import { getTriMatchReport, getAuditImage } from '../controllers/triMatchController';
+import { pushLiveTelemetry, getLiveTelemetry } from '../controllers/liveTelemetryController';
+import {
+  getAiBrainState,
+  teachAiObject,
+  observeAndLearnPerson,
+  updateAiBrainEntity,
+  deleteAiBrainEntity,
+  exportAiBrainBackup,
+  importAiBrainBackup,
+} from '../controllers/aiTrainerController';
 import {
   getCameras,
   saveCamera,
@@ -53,10 +63,23 @@ import {
 
 const router = Router();
 
-// Public Frame Ingestion from Local Shop DVR Bridge
+// Public Frame & Live Telemetry Ingestion from Local Shop DVR Bridge / Python Edge AI
 router.post('/:id/push-frame', pushCameraFrame);
+router.post('/live-telemetry', pushLiveTelemetry);
+router.post('/ai-brain/observe-person', observeAndLearnPerson);
 
 router.use(authenticate);
+
+// Live Real-Time Telemetry & Pipeline Health Diagnostics
+router.get('/live-telemetry', getLiveTelemetry);
+
+// Permanent Self-Learning AI Brain, Video Trainer & Backup Routes
+router.get('/ai-brain', getAiBrainState);
+router.post('/ai-brain/teach-object', teachAiObject);
+router.patch('/ai-brain/entity/:id', updateAiBrainEntity);
+router.delete('/ai-brain/entity/:id', deleteAiBrainEntity);
+router.get('/ai-brain/export-backup', exportAiBrainBackup);
+router.post('/ai-brain/import-backup', importAiBrainBackup);
 
 // 1. Owner & Staff Face Enrollment & Instructions
 router.get('/profiles', getPersonProfiles);

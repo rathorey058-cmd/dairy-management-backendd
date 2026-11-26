@@ -42,6 +42,7 @@ io.on('connection', (socket) => {
   // Local Shop DVR Bridge pushes live snapshots for channels
   socket.on('dvr:push_frame', (frame: {
     cameraId: string;
+    tenantId?: string;
     channel?: number;
     base64Data: string;
     contentType?: string;
@@ -52,14 +53,35 @@ io.on('connection', (socket) => {
           ? frame.base64Data.split('base64,')[1]
           : frame.base64Data;
         const buf = Buffer.from(rawBase64, 'base64');
+        const ts = Date.now();
         liveDvrFrameCache.set(frame.cameraId, {
           buffer: buf,
           contentType: frame.contentType || 'image/jpeg',
-          timestamp: Date.now()
+          timestamp: ts
         });
+        if (frame.tenantId) {
+          io.to(`tenant:${frame.tenantId}:cameras`).emit('camera:frame_ready', {
+            cameraId: frame.cameraId,
+            channel: frame.channel,
+            timestamp: ts
+          });
+        } else {
+          io.emit('camera:frame_ready', {
+            cameraId: frame.cameraId,
+            channel: frame.channel,
+            timestamp: ts
+          });
+        }
       } catch (err) {
         console.warn('Frame cache decode error:', err);
       }
+    }
+  });
+
+  // Web / Mobile client subscribes to live AI Camera & 3D Twin telemetry
+  socket.on('camera:join_live', (tenantId: string) => {
+    if (tenantId) {
+      socket.join(`tenant:${tenantId}:cameras`);
     }
   });
 
