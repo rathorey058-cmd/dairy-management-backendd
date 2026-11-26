@@ -235,6 +235,19 @@ const runBridge = async () => {
   streamCycle();
 };
 
-runBridge().catch((e) => {
-  console.error('Fatal bridge error:', e);
+const acquireSingleBridgeLock = (port = 47892): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const lockSrv = net.createServer();
+    lockSrv.once('error', () => {
+      console.log(`ℹ️ Another DVR Bridge instance is already running (lock port ${port}). Exiting duplicate cleanly.`);
+      process.exit(0);
+    });
+    lockSrv.listen(port, '127.0.0.1', () => resolve(true));
+  });
+};
+
+acquireSingleBridgeLock().then(() => {
+  runBridge().catch((e) => {
+    console.error('Fatal bridge error:', e);
+  });
 });
